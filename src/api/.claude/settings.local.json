@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//c/Users/HP/Documents/Code/ECE496/project-prometheus/**)",
+      "Bash(tree /F \"C:\\Users\\HP\\Documents\\Code\\ECE496\\project-prometheus\\src\\api\")"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
