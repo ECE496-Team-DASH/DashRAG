@@ -1,0 +1,26 @@
+type: http_request
+model: http_request
+id: rq_Ad8GX5STFi
+createdAt: 2025-11-01T02:44:39.435724200
+updatedAt: 2025-11-01T03:37:03.547621
+workspaceId: wk_rRjy4MLNiD
+folderId: fl_tUFZJQ4bqo
+authentication: {}
+authenticationType: null
+body:
+  text: |-
+    {
+        "title": "test2"
+    }
+bodyType: application/json
+description: ''
+headers:
+- enabled: true
+  name: Content-Type
+  value: application/json
+  id: MSugv9qCZi
+method: POST
+name: /sessions
+sortPriority: 1000.0
+url: ${[ BASE_URL ]}/sessions
+urlParameters: []

@@ -1,0 +1,40 @@
+type: http_request
+model: http_request
+id: rq_9HZ4WtcLjX
+createdAt: 2025-11-01T03:11:34.207981400
+updatedAt: 2025-11-01T03:15:35.666017500
+workspaceId: wk_rRjy4MLNiD
+folderId: fl_WSbUMgtXYm
+authentication: {}
+authenticationType: null
+body:
+  form:
+  - contentType: multipart/form-data
+    enabled: true
+    id: v0I3vIKXdX
+    name: file
+    value: File
+  - enabled: true
+    id: KxkHDcptqG
+    name: ''
+    value: ''
+bodyType: binary
+description: ''
+headers:
+- enabled: true
+  name: Content-Type
+  value: application/x-www-form-urlencoded
+  id: FX6nmYJQa7
+method: POST
+name: /documents/upload
+sortPriority: 0.0021999999999999997
+url: ${[ BASE_URL ]}/documents/upload
+urlParameters:
+- enabled: true
+  name: sid
+  value: sess_62434ec3efbc
+  id: ZmVNugy7es
+- enabled: true
+  name: ''
+  value: ''
+  id: yUreKPBSqB

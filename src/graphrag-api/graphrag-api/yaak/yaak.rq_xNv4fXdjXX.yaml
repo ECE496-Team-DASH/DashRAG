@@ -1,0 +1,26 @@
+type: http_request
+model: http_request
+id: rq_xNv4fXdjXX
+createdAt: 2025-11-01T03:08:45.314637400
+updatedAt: 2025-11-01T03:36:59.902417
+workspaceId: wk_rRjy4MLNiD
+folderId: fl_tUFZJQ4bqo
+authentication: {}
+authenticationType: null
+body: {}
+bodyType: null
+description: ''
+headers: []
+method: GET
+name: /sessions/export
+sortPriority: 4000.0
+url: ${[ BASE_URL ]}/sessions/export
+urlParameters:
+- enabled: true
+  name: sid
+  value: sess_62434ec3efbc
+  id: kNmZPKG3mr
+- enabled: true
+  name: ''
+  value: ''
+  id: MbxmyXz9aP
