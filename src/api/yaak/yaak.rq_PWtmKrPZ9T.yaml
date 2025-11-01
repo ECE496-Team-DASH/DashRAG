@@ -2,7 +2,7 @@ type: http_request
 model: http_request
 id: rq_PWtmKrPZ9T
 createdAt: 2025-11-01T03:10:23.197622700
-updatedAt: 2025-11-01T03:17:18.421960300
+updatedAt: 2025-11-01T23:12:51.098339800
 workspaceId: wk_rRjy4MLNiD
 folderId: fl_4gEtSFTJny
 authentication: {}
@@ -13,7 +13,7 @@ description: ''
 headers: []
 method: GET
 name: /documents/search-arxiv
-sortPriority: 0.0001
+sortPriority: 0.0
 url: ${[ BASE_URL ]}/documents/search-arxiv
 urlParameters:
 - enabled: true

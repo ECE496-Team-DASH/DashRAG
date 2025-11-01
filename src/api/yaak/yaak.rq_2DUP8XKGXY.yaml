@@ -1,10 +1,10 @@
 type: http_request
 model: http_request
-id: rq_Na3fW7Z6qW
-createdAt: 2025-11-01T02:50:07.003464800
-updatedAt: 2025-11-01T03:09:20.878735900
+id: rq_2DUP8XKGXY
+createdAt: 2025-11-01T16:56:56.217970100
+updatedAt: 2025-11-01T17:03:41.788025100
 workspaceId: wk_rRjy4MLNiD
-folderId: null
+folderId: fl_5sRi6UVWDX
 authentication: {}
 authenticationType: null
 body: {}
@@ -12,15 +12,15 @@ bodyType: null
 description: ''
 headers: []
 method: GET
-name: ''
-sortPriority: 0.0
-url: ${[ BASE_URL ]}/sessions/
+name: /messages
+sortPriority: 0.0011
+url: ${[ BASE_URL ]}/messages
 urlParameters:
 - enabled: true
   name: sid
-  value: test
-  id: yKKpctT5uH
+  value: sess_b0f520840f8f
+  id: mtT7mDFFmK
 - enabled: true
   name: ''
   value: ''
-  id: FjrkArbWD9
+  id: ZIhtEeB9hV

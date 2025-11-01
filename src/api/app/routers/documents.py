@@ -163,7 +163,7 @@ async def upload_pdf(sid: str = Query(..., description="Session ID"), file: Uplo
         graph_dir = _graph_dir(sid); graph_dir.mkdir(parents=True, exist_ok=True)
         with session_lock(_lock_file(sid)):
             try:
-                DashRAGService(graph_dir).insert_texts(text)
+                await DashRAGService(graph_dir).insert_texts(text)
                 doc.status = DocStatus.ready
                 logger.info(f"Document {doc.id} successfully inserted into knowledge graph")
             except Exception as e:
@@ -272,7 +272,7 @@ def preview_arxiv(sid: str = Query(..., description="Session ID"), query: str = 
         404: {"description": "Session not found or arXiv paper not found"}
     }
 )
-def add_arxiv(sid: str = Query(..., description="Session ID"), payload: dict = None, db: DBSession = Depends(get_db)):
+async def add_arxiv(sid: str = Query(..., description="Session ID"), payload: dict = None, db: DBSession = Depends(get_db)):
     """Download and add an arXiv paper to the knowledge graph"""
     logger.info(f"Adding arXiv paper to session {sid}")
     sess = db.get(SessionModel, sid)
@@ -300,7 +300,7 @@ def add_arxiv(sid: str = Query(..., description="Session ID"), payload: dict = N
         graph_dir = _graph_dir(sid); graph_dir.mkdir(parents=True, exist_ok=True)
         with session_lock(_lock_file(sid)):
             try:
-                DashRAGService(graph_dir).insert_texts(text)
+                await DashRAGService(graph_dir).insert_texts(text)
                 doc.status = DocStatus.ready
                 logger.info(f"Document {doc.id} (arXiv: {arxiv_id}) successfully inserted into knowledge graph")
             except Exception as e:

@@ -141,7 +141,7 @@ def list_messages(sid: str = Query(..., description="Session ID"), db: DBSession
         500: {"description": "Query processing error"}
     }
 )
-def create_message(sid: str = Query(..., description="Session ID"), payload: dict = None, db: DBSession = Depends(get_db)):
+async def create_message(sid: str = Query(..., description="Session ID"), payload: dict = None, db: DBSession = Depends(get_db)):
     """Query the knowledge graph and get a response"""
     sess = db.get(SessionModel, sid)
     if not sess:
@@ -166,9 +166,13 @@ def create_message(sid: str = Query(..., description="Session ID"), payload: dic
 
     rag = DashRAGService(_graph_dir(sid))
     try:
-        answer = rag.query(prompt, **{k:v for k,v in qp_kwargs.items() if v is not None})
+        answer = await rag.query(prompt, **{k:v for k,v in qp_kwargs.items() if v is not None})
+    except ValueError as e:
+        # User-friendly error messages
+        raise HTTPException(400, str(e))
     except Exception as e:
-        raise HTTPException(500, str(e))
+        # Internal errors
+        raise HTTPException(500, f"Query failed: {str(e)}")
 
     m_asst = Message(session_id=sid, role=Role.assistant, content={"text": answer})
     db.add(m_asst); db.commit(); db.refresh(m_asst)
@@ -269,10 +273,17 @@ async def create_message_stream(sid: str = Query(..., description="Session ID"),
 
     rag = DashRAGService(_graph_dir(sid))
     try:
-        answer = rag.query(prompt, **{k:v for k,v in qp_kwargs.items() if v is not None})
-    except Exception as e:
+        answer = await rag.query(prompt, **{k:v for k,v in qp_kwargs.items() if v is not None})
+    except ValueError as e:
+        # User-friendly error messages
         async def err_stream():
             payload = {"type": "error", "message": str(e)}
+            yield ("data: " + json.dumps(payload) + "\n\n").encode("utf-8")
+        return StreamingResponse(err_stream(), media_type="text/event-stream")
+    except Exception as e:
+        # Internal errors
+        async def err_stream():
+            payload = {"type": "error", "message": f"Query failed: {str(e)}"}
             yield ("data: " + json.dumps(payload) + "\n\n").encode("utf-8")
         return StreamingResponse(err_stream(), media_type="text/event-stream")
 

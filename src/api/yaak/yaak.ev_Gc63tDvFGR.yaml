@@ -1,0 +1,17 @@
+type: environment
+model: environment
+id: ev_Gc63tDvFGR
+workspaceId: wk_rRjy4MLNiD
+createdAt: 2025-11-01T04:55:19.825341900
+updatedAt: 2025-11-01T04:55:41.974130300
+name: Local
+public: true
+base: false
+parentModel: environment
+parentId: ev_BNi2e9VLmM
+variables:
+- enabled: true
+  name: BASE_URL
+  value: http://127.0.0.1:8000
+  id: CK4CQAUqmW
+color: null

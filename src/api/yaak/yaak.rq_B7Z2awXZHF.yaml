@@ -1,16 +1,18 @@
 type: http_request
 model: http_request
-id: rq_nYQUtXnBSb
-createdAt: 2025-11-01T03:16:05.403083700
-updatedAt: 2025-11-01T23:12:51.105011200
+id: rq_B7Z2awXZHF
+createdAt: 2025-11-01T16:57:06.375386300
+updatedAt: 2025-11-01T23:11:47.676103600
 workspaceId: wk_rRjy4MLNiD
-folderId: fl_4gEtSFTJny
+folderId: fl_5sRi6UVWDX
 authentication: {}
 authenticationType: null
 body:
   text: |-
     {
-        "arxiv_id": "1101.3773v2"
+        "content": "what is common between octants and medical RAG?",
+        "mode": "global",
+        "top_k": 10
     }
 bodyType: application/json
 description: ''
@@ -18,17 +20,17 @@ headers:
 - enabled: true
   name: Content-Type
   value: application/json
-  id: ccnVF9xhYm
+  id: 9CrRVBUpvV
 method: POST
-name: /documents/add-arxiv
-sortPriority: 1000.0
-url: ${[ BASE_URL ]}/documents/add-arxiv
+name: /messages
+sortPriority: 0.0021000000000000003
+url: ${[ BASE_URL ]}/messages
 urlParameters:
 - enabled: true
   name: sid
   value: sess_8c85746b97f0
-  id: ZmVNugy7es
+  id: 9mjZqiPvGt
 - enabled: true
   name: ''
   value: ''
-  id: 2ziu5FtncV
+  id: bT5hQEdbzq

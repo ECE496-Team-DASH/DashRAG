@@ -48,7 +48,7 @@ cp .env.example .env
 #   - AZURE_OPENAI_API_KEY + AZURE_OPENAI_ENDPOINT (for Azure OpenAI)
 
 # 4. Run the server
-uvicorn app.main:app --reload
+uvicorn app.main:app --reload --reload-exclude 'reference-implementations/*' --reload-exclude '*.log'
 
 # 5. Open interactive API docs
 # http://localhost:8000/docs
@@ -78,6 +78,13 @@ python clean_state.py --confirm
 This will:
 - Delete the SQLite database file (`dashrag.db`)
 - Remove all session data from `data/sessions/`
+
+### Update nano-graphrag version
+
+Update git reference for nano-graphrag in requirements.txt and run the following to reinstall:
+```bash
+uv pip install -r requirements.txt --force-reinstall --no-cache-dir
+```
 
 ---
 
