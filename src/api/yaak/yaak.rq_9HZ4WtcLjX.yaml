@@ -1,0 +1,39 @@
+type: http_request
+model: http_request
+id: rq_9HZ4WtcLjX
+createdAt: 2025-11-01T03:11:34.207981400
+updatedAt: 2025-11-01T22:06:46.203165600
+workspaceId: wk_rRjy4MLNiD
+folderId: fl_WSbUMgtXYm
+authentication: {}
+authenticationType: null
+body:
+  form:
+  - enabled: true
+    file: C:\Users\MSadm\Downloads\2510.23995v1.pdf
+    id: dKhpzNK67Q
+    name: file
+  - enabled: true
+    id: 3FHat4RJNP
+    name: ''
+    value: ''
+bodyType: multipart/form-data
+description: ''
+headers:
+- enabled: true
+  name: Content-Type
+  value: multipart/form-data
+  id: HdyZaXEbrK
+method: POST
+name: /documents/upload
+sortPriority: 0.0021999999999999997
+url: ${[ BASE_URL ]}/documents/upload
+urlParameters:
+- enabled: true
+  name: sid
+  value: sess_8c85746b97f0
+  id: ZmVNugy7es
+- enabled: true
+  name: ''
+  value: ''
+  id: kGfgXNTJWr

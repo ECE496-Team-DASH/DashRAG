@@ -1,0 +1,34 @@
+type: http_request
+model: http_request
+id: rq_nYQUtXnBSb
+createdAt: 2025-11-01T03:16:05.403083700
+updatedAt: 2025-11-01T23:12:51.105011200
+workspaceId: wk_rRjy4MLNiD
+folderId: fl_4gEtSFTJny
+authentication: {}
+authenticationType: null
+body:
+  text: |-
+    {
+        "arxiv_id": "1101.3773v2"
+    }
+bodyType: application/json
+description: ''
+headers:
+- enabled: true
+  name: Content-Type
+  value: application/json
+  id: ccnVF9xhYm
+method: POST
+name: /documents/add-arxiv
+sortPriority: 1000.0
+url: ${[ BASE_URL ]}/documents/add-arxiv
+urlParameters:
+- enabled: true
+  name: sid
+  value: sess_8c85746b97f0
+  id: ZmVNugy7es
+- enabled: true
+  name: ''
+  value: ''
+  id: 2ziu5FtncV

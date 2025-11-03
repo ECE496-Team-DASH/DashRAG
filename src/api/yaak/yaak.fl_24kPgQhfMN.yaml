@@ -1,0 +1,13 @@
+type: folder
+model: folder
+id: fl_24kPgQhfMN
+createdAt: 2025-11-01T02:49:25.852604100
+updatedAt: 2025-11-01T17:54:04.777517300
+workspaceId: wk_rRjy4MLNiD
+folderId: null
+authentication: {}
+authenticationType: null
+description: ''
+headers: []
+name: healthz
+sortPriority: 0.0

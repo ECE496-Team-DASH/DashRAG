@@ -1,0 +1,36 @@
+type: http_request
+model: http_request
+id: rq_B7Z2awXZHF
+createdAt: 2025-11-01T16:57:06.375386300
+updatedAt: 2025-11-01T23:11:47.676103600
+workspaceId: wk_rRjy4MLNiD
+folderId: fl_5sRi6UVWDX
+authentication: {}
+authenticationType: null
+body:
+  text: |-
+    {
+        "content": "what is common between octants and medical RAG?",
+        "mode": "global",
+        "top_k": 10
+    }
+bodyType: application/json
+description: ''
+headers:
+- enabled: true
+  name: Content-Type
+  value: application/json
+  id: 9CrRVBUpvV
+method: POST
+name: /messages
+sortPriority: 0.0021000000000000003
+url: ${[ BASE_URL ]}/messages
+urlParameters:
+- enabled: true
+  name: sid
+  value: sess_8c85746b97f0
+  id: 9mjZqiPvGt
+- enabled: true
+  name: ''
+  value: ''
+  id: bT5hQEdbzq

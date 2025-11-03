@@ -1,0 +1,13 @@
+type: folder
+model: folder
+id: fl_WSbUMgtXYm
+createdAt: 2025-11-01T03:09:18.690752600
+updatedAt: 2025-11-01T17:54:11.795803600
+workspaceId: wk_rRjy4MLNiD
+folderId: null
+authentication: {}
+authenticationType: null
+description: ''
+headers: []
+name: documents
+sortPriority: 2000.0
