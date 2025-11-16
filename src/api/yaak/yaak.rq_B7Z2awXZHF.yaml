@@ -2,7 +2,7 @@ type: http_request
 model: http_request
 id: rq_B7Z2awXZHF
 createdAt: 2025-11-01T16:57:06.375386300
-updatedAt: 2025-11-16T04:49:16.239602200
+updatedAt: 2025-11-16T17:31:36.569887400
 workspaceId: wk_rRjy4MLNiD
 folderId: fl_5sRi6UVWDX
 authentication: {}
@@ -10,7 +10,7 @@ authenticationType: null
 body:
   text: |-
     {
-        "content": "what is M-Eval?",
+        "content": "what is linearrag?",
         "mode": "local",
         "top_k": 10
     }

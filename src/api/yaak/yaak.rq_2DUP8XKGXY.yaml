@@ -2,7 +2,7 @@ type: http_request
 model: http_request
 id: rq_2DUP8XKGXY
 createdAt: 2025-11-01T16:56:56.217970100
-updatedAt: 2025-11-16T04:45:13.389622200
+updatedAt: 2025-11-16T20:51:26.033491500
 workspaceId: wk_rRjy4MLNiD
 folderId: fl_5sRi6UVWDX
 authentication: {}
@@ -18,9 +18,9 @@ url: ${[ BASE_URL ]}/messages
 urlParameters:
 - enabled: true
   name: sid
-  value: '2'
+  value: '1'
   id: mtT7mDFFmK
 - enabled: true
   name: ''
   value: ''
-  id: HIynfsMuss
+  id: EDvcY2RUwP

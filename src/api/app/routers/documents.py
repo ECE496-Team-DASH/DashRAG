@@ -1,9 +1,12 @@
 
 from fastapi import APIRouter, UploadFile, File, HTTPException, Depends, Query, BackgroundTasks
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session as DBSession
 from pathlib import Path
 import logging
 import traceback
+import asyncio
+import json
 
 from ..db import SessionLocal
 from ..models import Session as SessionModel, Document, DocSource, DocStatus
@@ -317,3 +320,108 @@ async def add_arxiv(
     )
     
     return {"id": doc.id, "status": doc.status.value, "arxiv_id": arxiv_id}
+
+
+@router.get(
+    "/progress-stream",
+    summary="Stream document processing progress (SSE)",
+    description="""
+    Real-time Server-Sent Events stream for document processing progress.
+    
+    Subscribe to this endpoint to receive live updates about document processing
+    including current phase, progress percentage, and status changes.
+    
+    **Event types:**
+    - `progress` - Progress update with phase and percentage
+    - `complete` - Document processing finished
+    - `error` - Processing failed
+    
+    **Event data format:**
+    ```json
+    {
+        "document_id": 1,
+        "status": "inserting",
+        "processing_phase": "entity_extraction",
+        "progress_percent": 45
+    }
+    ```
+    """,
+    responses={
+        200: {"description": "SSE stream"},
+        404: {"description": "Session or document not found"}
+    }
+)
+async def stream_document_progress(
+    sid: int = Query(..., description="Session ID"),
+    doc_id: int = Query(..., description="Document ID to monitor"),
+    db: DBSession = Depends(get_db)
+):
+    """Stream real-time progress updates for a document"""
+    
+    sess = db.get(SessionModel, sid)
+    if not sess:
+        raise HTTPException(404, "Session not found")
+    
+    doc = db.get(Document, doc_id)
+    if not doc or doc.session_id != sid:
+        raise HTTPException(404, "Document not found in session")
+    
+    async def event_generator():
+        """Generate SSE events for document progress"""
+        last_status = None
+        last_phase = None
+        last_progress = None
+        
+        # Poll database for changes every 1 second
+        while True:
+            try:
+                # Create a new database session for each iteration
+                local_db = SessionLocal()
+                try:
+                    local_doc = local_db.get(Document, doc_id)
+                    
+                    if not local_doc:
+                        yield f"data: {json.dumps({'event': 'error', 'message': 'Document not found'})}\n\n"
+                        break
+                    
+                    # Check if anything changed
+                    if (local_doc.status != last_status or 
+                        local_doc.processing_phase != last_phase or 
+                        local_doc.progress_percent != last_progress):
+                        
+                        event_data = {
+                            "document_id": local_doc.id,
+                            "status": local_doc.status.value,
+                            "processing_phase": local_doc.processing_phase,
+                            "progress_percent": local_doc.progress_percent
+                        }
+                        
+                        yield f"data: {json.dumps(event_data)}\n\n"
+                        
+                        last_status = local_doc.status
+                        last_phase = local_doc.processing_phase
+                        last_progress = local_doc.progress_percent
+                    
+                    # Stop streaming if document reached terminal state
+                    if local_doc.status in [DocStatus.ready, DocStatus.error]:
+                        yield f"data: {json.dumps({'event': 'complete', 'status': local_doc.status.value})}\n\n"
+                        break
+                finally:
+                    local_db.close()
+                
+                await asyncio.sleep(1)
+                
+            except Exception as e:
+                logger.error(f"Error in progress stream: {e}")
+                yield f"data: {json.dumps({'event': 'error', 'message': str(e)})}\n\n"
+                break
+    
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no"
+        }
+    )

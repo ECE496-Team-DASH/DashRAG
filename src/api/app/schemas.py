@@ -12,6 +12,23 @@ class SessionOut(BaseModel):
     settings: dict
     stats: dict | None = None
 
+class DocumentResponse(BaseModel):
+    id: int
+    session_id: int
+    source_type: str
+    title: str | None
+    status: str
+    processing_phase: str | None = None
+    progress_percent: int | None = None
+    arxiv_id: str | None = None
+    authors: str | None = None
+    published_at: str | None = None
+    pages: int | None = None
+    created_at: str
+
+    class Config:
+        from_attributes = True
+
 class ChatRequest(BaseModel):
     content: str
     mode: Literal["local","global","naive"] | None = None

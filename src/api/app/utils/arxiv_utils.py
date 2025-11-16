@@ -7,10 +7,11 @@ def search_arxiv(query: str, max_results: int = 5) -> List[Dict]:
     out = []
     for r in search.results():
         out.append({
-            "id": r.get_short_id(),
+            "arxiv_id": r.get_short_id(),
             "title": r.title,
             "authors": ", ".join(a.name for a in r.authors),
-            "published": r.published.strftime("%Y-%m-%d") if r.published else None,
+            "abstract": r.summary,
+            "published_at": r.published.strftime("%Y-%m-%d") if r.published else None,
             "pdf_url": r.pdf_url
         })
     return out

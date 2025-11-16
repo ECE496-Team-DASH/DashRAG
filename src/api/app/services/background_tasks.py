@@ -11,11 +11,12 @@ import logging
 import traceback
 import asyncio
 
-from ..models import Document, DocStatus, Message, Role
+from ..models import Document, DocStatus, Message, Role, ProcessingPhase
 from ..utils.pdf_utils import extract_text
 from ..utils.arxiv_utils import download_pdf
 from ..utils.locks import session_lock
 from ..services.graphrag_service import DashRAGService
+from ..services.progress_tracker import attach_progress_handler, detach_progress_handler
 from ..db import SessionLocal
 
 logger = logging.getLogger(__name__)
@@ -50,10 +51,15 @@ def process_uploaded_document(
         
         logger.info(f"Background processing document {doc_id} from session {session_id}")
         
-        # Extract text from PDF
+        # Phase 1: Extract text from PDF
+        doc.processing_phase = ProcessingPhase.pdf_extraction.value
+        doc.progress_percent = 10
+        db.commit()
+        
         try:
             text, pages = extract_text(pdf_path)
             doc.pages = pages
+            doc.progress_percent = 15
             db.commit()
             logger.info(f"Extracted {pages} pages from document {doc_id}")
         except Exception as e:
@@ -64,20 +70,48 @@ def process_uploaded_document(
             db.commit()
             return
         
-        # Insert into knowledge graph
+        # Phase 2: Insert into knowledge graph with progress tracking
         graph_dir.mkdir(parents=True, exist_ok=True)
-        with session_lock(lock_file):
-            try:
-                # Run async GraphRAG operation in new event loop
-                asyncio.run(DashRAGService(graph_dir).insert_texts(text))
-                doc.status = DocStatus.ready
-                logger.info(f"Document {doc_id} successfully inserted into knowledge graph")
-            except Exception as e:
-                error_msg = f"GraphRAG insertion failed: {str(e)}"
-                logger.error(error_msg, exc_info=True)
-                doc.status = DocStatus.error
-                doc.insert_log = f"{error_msg}\n\nTraceback:\n{traceback.format_exc()}"
-            db.commit()
+        
+        # Attach progress handler to track nano-graphrag logs
+        progress_handler = attach_progress_handler(doc_id, db)
+        
+        try:
+            with session_lock(lock_file):
+                try:
+                    # Run async GraphRAG operation in new event loop
+                    asyncio.run(DashRAGService(graph_dir).insert_texts(text))
+                    doc.status = DocStatus.ready
+                    doc.processing_phase = None
+                    doc.progress_percent = 100
+                    
+                    # Check if there were any warnings in the log
+                    if "incomplete knowledge graph" in (doc.insert_log or "").lower():
+                        doc.insert_log = (doc.insert_log or "") + "\n\nWarning: Community reports may be incomplete due to LLM JSON formatting issues."
+                    
+                    logger.info(f"Document {doc_id} successfully inserted into knowledge graph")
+                except Exception as e:
+                    error_msg = f"GraphRAG insertion failed: {str(e)}"
+                    
+                    # Check if it's a JSON parsing error that we can recover from
+                    if "JSONDecodeError" in str(e) or "Expecting ':' delimiter" in str(e):
+                        logger.warning(f"Document {doc_id} encountered JSON parsing errors during community report generation, but entities may have been extracted")
+                        # Mark as ready with a warning note
+                        doc.status = DocStatus.ready
+                        doc.processing_phase = None
+                        doc.progress_percent = 100
+                        doc.insert_log = f"Warning: Community reports incomplete due to LLM response formatting issues.\n\nEntities and relationships were successfully extracted, but some high-level summaries may be missing.\n\nOriginal error: {str(e)}"
+                        logger.info(f"Document {doc_id} marked as ready with warnings")
+                    else:
+                        logger.error(error_msg, exc_info=True)
+                        doc.status = DocStatus.error
+                        doc.processing_phase = None
+                        doc.progress_percent = 0
+                        doc.insert_log = f"{error_msg}\n\nTraceback:\n{traceback.format_exc()}"
+                db.commit()
+        finally:
+            # Always remove the progress handler
+            detach_progress_handler(progress_handler)
     
     except Exception as e:
         logger.error(f"Unexpected error processing document {doc_id}: {str(e)}", exc_info=True)
@@ -153,20 +187,48 @@ def process_arxiv_document(
             db.commit()
             return
         
-        # Insert into knowledge graph
+        # Phase 2: Insert into knowledge graph with progress tracking
         graph_dir.mkdir(parents=True, exist_ok=True)
-        with session_lock(lock_file):
-            try:
-                # Run async GraphRAG operation in new event loop
-                asyncio.run(DashRAGService(graph_dir).insert_texts(text))
-                doc.status = DocStatus.ready
-                logger.info(f"Document {doc_id} (arXiv: {arxiv_id}) successfully inserted into knowledge graph")
-            except Exception as e:
-                error_msg = f"GraphRAG insertion failed: {str(e)}"
-                logger.error(error_msg, exc_info=True)
-                doc.status = DocStatus.error
-                doc.insert_log = f"{error_msg}\n\nTraceback:\n{traceback.format_exc()}"
-            db.commit()
+        
+        # Attach progress handler to track nano-graphrag logs
+        progress_handler = attach_progress_handler(doc_id, db)
+        
+        try:
+            with session_lock(lock_file):
+                try:
+                    # Run async GraphRAG operation in new event loop
+                    asyncio.run(DashRAGService(graph_dir).insert_texts(text))
+                    doc.status = DocStatus.ready
+                    doc.processing_phase = None
+                    doc.progress_percent = 100
+                    
+                    # Check if there were any warnings in the log
+                    if "incomplete knowledge graph" in (doc.insert_log or "").lower():
+                        doc.insert_log = (doc.insert_log or "") + "\n\nWarning: Community reports may be incomplete due to LLM JSON formatting issues."
+                    
+                    logger.info(f"Document {doc_id} (arXiv: {arxiv_id}) successfully inserted into knowledge graph")
+                except Exception as e:
+                    error_msg = f"GraphRAG insertion failed: {str(e)}"
+                    
+                    # Check if it's a JSON parsing error that we can recover from
+                    if "JSONDecodeError" in str(e) or "Expecting ':' delimiter" in str(e):
+                        logger.warning(f"Document {doc_id} (arXiv: {arxiv_id}) encountered JSON parsing errors during community report generation, but entities may have been extracted")
+                        # Mark as ready with a warning note
+                        doc.status = DocStatus.ready
+                        doc.processing_phase = None
+                        doc.progress_percent = 100
+                        doc.insert_log = f"Warning: Community reports incomplete due to LLM response formatting issues.\n\nEntities and relationships were successfully extracted, but some high-level summaries may be missing.\n\nOriginal error: {str(e)}"
+                        logger.info(f"Document {doc_id} (arXiv: {arxiv_id}) marked as ready with warnings")
+                    else:
+                        logger.error(error_msg, exc_info=True)
+                        doc.status = DocStatus.error
+                        doc.processing_phase = None
+                        doc.progress_percent = 0
+                        doc.insert_log = f"{error_msg}\n\nTraceback:\n{traceback.format_exc()}"
+                db.commit()
+        finally:
+            # Always remove the progress handler
+            detach_progress_handler(progress_handler)
     
     except Exception as e:
         logger.error(f"Unexpected error processing arXiv document {doc_id}: {str(e)}", exc_info=True)

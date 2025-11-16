@@ -17,6 +17,14 @@ class DocStatus(str, enum.Enum):
     ready = "ready"
     error = "error"
 
+class ProcessingPhase(str, enum.Enum):
+    pdf_extraction = "pdf_extraction"
+    text_chunking = "text_chunking"
+    entity_extraction = "entity_extraction"
+    graph_clustering = "graph_clustering"
+    community_reports = "community_reports"
+    finalizing = "finalizing"
+
 class Role(str, enum.Enum):
     user = "user"
     assistant = "assistant"
@@ -47,6 +55,8 @@ class Document(Base):
     pdf_url: Mapped[str | None] = mapped_column(String, nullable=True)
     local_pdf_path: Mapped[str | None] = mapped_column(String, nullable=True)
     status: Mapped[DocStatus] = mapped_column(Enum(DocStatus), default=DocStatus.pending)
+    processing_phase: Mapped[str | None] = mapped_column(String, nullable=True)
+    progress_percent: Mapped[int | None] = mapped_column(Integer, nullable=True)
     insert_log: Mapped[str | None] = mapped_column(Text, nullable=True)
     pages: Mapped[int | None] = mapped_column(Integer, nullable=True)
     tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
