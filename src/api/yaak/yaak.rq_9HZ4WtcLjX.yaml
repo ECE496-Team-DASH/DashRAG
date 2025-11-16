@@ -2,7 +2,7 @@ type: http_request
 model: http_request
 id: rq_9HZ4WtcLjX
 createdAt: 2025-11-01T03:11:34.207981400
-updatedAt: 2025-11-01T22:06:46.203165600
+updatedAt: 2025-11-16T04:45:06.046225600
 workspaceId: wk_rRjy4MLNiD
 folderId: fl_WSbUMgtXYm
 authentication: {}
@@ -31,9 +31,9 @@ url: ${[ BASE_URL ]}/documents/upload
 urlParameters:
 - enabled: true
   name: sid
-  value: sess_8c85746b97f0
+  value: '2'
   id: ZmVNugy7es
 - enabled: true
   name: ''
   value: ''
-  id: kGfgXNTJWr
+  id: SJzV4bm2Ju

@@ -22,8 +22,8 @@ def get_db():
     finally:
         db.close()
 
-def _session_root(sid: str) -> Path:
-    return settings.data_root / "sessions" / sid
+def _session_root(sid: int) -> Path:
+    return settings.data_root / "sessions" / str(sid)
 
 @router.post(
     "", 
@@ -53,7 +53,7 @@ def _session_root(sid: str) -> Path:
             "content": {
                 "application/json": {
                     "example": {
-                        "id": "sess_a1b2c3d4e5f6",
+                        "id": 1,
                         "title": "Healthcare LLMs Research",
                         "settings": {},
                         "stats": {"doc_count": 0}
@@ -92,12 +92,12 @@ def create_session(payload: dict, db: DBSession = Depends(get_db)):
                 "application/json": {
                     "example": [
                         {
-                            "id": "sess_a1b2c3d4e5f6",
+                            "id": 1,
                             "title": "Healthcare LLMs Research",
                             "settings": {}
                         },
                         {
-                            "id": "sess_f6e5d4c3b2a1",
+                            "id": 2,
                             "title": "Climate Change Papers",
                             "settings": {}
                         }
@@ -120,7 +120,7 @@ def list_sessions(db: DBSession = Depends(get_db)):
     Retrieve detailed information about a specific session.
     
     **Query parameters:**
-    - `sid`: Session ID (format: `sess_xxxxxxxxxxxx`)
+    - `sid`: Session ID (integer)
     
     **Returns:** Session object with stats about the knowledge graph
     """,
@@ -130,7 +130,7 @@ def list_sessions(db: DBSession = Depends(get_db)):
             "content": {
                 "application/json": {
                     "example": {
-                        "id": "sess_a1b2c3d4e5f6",
+                        "id": 1,
                         "title": "Healthcare LLMs Research",
                         "settings": {},
                         "stats": {"graph_exists": True}
@@ -141,7 +141,7 @@ def list_sessions(db: DBSession = Depends(get_db)):
         404: {"description": "Session not found"}
     }
 )
-def get_session(sid: str = Query(..., description="Session ID"), db: DBSession = Depends(get_db)):
+def get_session(sid: int = Query(..., description="Session ID"), db: DBSession = Depends(get_db)):
     """Get details for a specific session"""
     s = db.get(SessionModel, sid)
     if not s:
@@ -178,7 +178,7 @@ def get_session(sid: str = Query(..., description="Session ID"), db: DBSession =
         404: {"description": "Session not found"}
     }
 )
-def delete_session(sid: str = Query(..., description="Session ID"), db: DBSession = Depends(get_db)):
+def delete_session(sid: int = Query(..., description="Session ID"), db: DBSession = Depends(get_db)):
     """Delete a session and all its data"""
     s = db.get(SessionModel, sid)
     if not s:
@@ -219,7 +219,7 @@ def delete_session(sid: str = Query(..., description="Session ID"), db: DBSessio
         404: {"description": "Session not found or directory missing"}
     }
 )
-def export_session(sid: str = Query(..., description="Session ID"), db: DBSession = Depends(get_db)):
+def export_session(sid: int = Query(..., description="Session ID"), db: DBSession = Depends(get_db)):
     """Export session data as a ZIP file"""
     s = db.get(SessionModel, sid)
     if not s:
@@ -229,6 +229,6 @@ def export_session(sid: str = Query(..., description="Session ID"), db: DBSessio
         raise HTTPException(404, "Session directory missing")
     tmp_dir = settings.data_root / "exports"
     tmp_dir.mkdir(parents=True, exist_ok=True)
-    zip_base = tmp_dir / sid
+    zip_base = tmp_dir / str(sid)
     zip_path = shutil.make_archive(str(zip_base), "zip", root_dir=base)
-    return FileResponse(zip_path, filename=f"{sid}.zip", media_type="application/zip")
+    return FileResponse(zip_path, filename=f"session_{sid}.zip", media_type="application/zip")

@@ -1,5 +1,5 @@
 
-from fastapi import APIRouter, HTTPException, Depends, Query
+from fastapi import APIRouter, HTTPException, Depends, Query, BackgroundTasks
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session as DBSession
 from typing import AsyncGenerator
@@ -9,6 +9,7 @@ import asyncio, json
 from ..db import SessionLocal
 from ..models import Session as SessionModel, Document, Message, Role, DocStatus
 from ..services.graphrag_service import DashRAGService
+from ..services.background_tasks import process_message_query
 from ..config import settings
 
 router = APIRouter(
@@ -24,8 +25,8 @@ def get_db():
     finally:
         db.close()
 
-def _graph_dir(sid: str) -> Path:
-    return settings.data_root / "sessions" / sid / "graph"
+def _graph_dir(sid: int) -> Path:
+    return settings.data_root / "sessions" / str(sid) / "graph"
 
 @router.get(
     "", 
@@ -52,12 +53,12 @@ def _graph_dir(sid: str) -> Path:
                 "application/json": {
                     "example": [
                         {
-                            "id": "msg_user_abc123",
+                            "id": 1,
                             "role": "user",
                             "content": {"text": "What are the key innovations in transformers?"}
                         },
                         {
-                            "id": "msg_asst_def456",
+                            "id": 2,
                             "role": "assistant",
                             "content": {"text": "Based on the papers, the key innovations include..."}
                         }
@@ -67,7 +68,7 @@ def _graph_dir(sid: str) -> Path:
         }
     }
 )
-def list_messages(sid: str = Query(..., description="Session ID"), db: DBSession = Depends(get_db)):
+def list_messages(sid: int = Query(..., description="Session ID"), db: DBSession = Depends(get_db)):
     """Get all messages in a session"""
     sess = db.get(SessionModel, sid)
     if not sess:
@@ -78,9 +79,20 @@ def list_messages(sid: str = Query(..., description="Session ID"), db: DBSession
 @router.post(
     "", 
     response_model=dict,
+    status_code=202,
     summary="Query knowledge graph (non-streaming)",
     description="""
-    Query the session's knowledge graph and get an AI-generated response.
+    Query the session's knowledge graph asynchronously and get an AI-generated response.
+    
+    **Process:**
+    1. User message is created immediately
+    2. 202 Accepted response returned with message ID
+    3. Background processing:
+       - Query executed against knowledge graph
+       - AI generates response
+       - Assistant message created with answer
+    
+    **Use GET /messages?sid={sid} to retrieve the full conversation including the AI response**
     
     **Request body:**
     ```json
@@ -120,29 +132,28 @@ def list_messages(sid: str = Query(..., description="Session ID"), db: DBSession
     **Requirements:** Session must have at least one document with status `ready`
     """,
     responses={
-        200: {
-            "description": "Query response",
+        202: {
+            "description": "Query accepted for processing",
             "content": {
                 "application/json": {
                     "example": {
-                        "message": {
-                            "id": "msg_asst_xyz789",
-                            "role": "assistant",
-                            "content": {
-                                "text": "Based on the knowledge graph, the main contributions are..."
-                            }
-                        }
+                        "message_id": 1,
+                        "status": "processing"
                     }
                 }
             }
         },
         400: {"description": "No ready documents or invalid parameters"},
-        404: {"description": "Session not found"},
-        500: {"description": "Query processing error"}
+        404: {"description": "Session not found"}
     }
 )
-async def create_message(sid: str = Query(..., description="Session ID"), payload: dict = None, db: DBSession = Depends(get_db)):
-    """Query the knowledge graph and get a response"""
+async def create_message(
+    background_tasks: BackgroundTasks,
+    sid: int = Query(..., description="Session ID"),
+    payload: dict = None,
+    db: DBSession = Depends(get_db)
+):
+    """Query the knowledge graph in the background"""
     sess = db.get(SessionModel, sid)
     if not sess:
         raise HTTPException(404, "Session not found")
@@ -155,29 +166,30 @@ async def create_message(sid: str = Query(..., description="Session ID"), payloa
     if not prompt or not isinstance(prompt, str):
         raise HTTPException(400, "content must be a string")
 
+    # Create user message immediately
     m_user = Message(session_id=sid, role=Role.user, content={"text": prompt})
-    db.add(m_user); db.commit(); db.refresh(m_user)
+    db.add(m_user)
+    db.commit()
+    db.refresh(m_user)
 
+    # Extract query parameters
     qp_kwargs = {k: payload.get(k) for k in [
         "mode", "top_k", "level", "response_type", "only_need_context",
         "include_text_chunks_in_context", "global_max_consider_community",
         "global_min_community_rating", "naive_max_token_for_text_unit"
     ]}
 
-    rag = DashRAGService(_graph_dir(sid))
-    try:
-        answer = await rag.query(prompt, **{k:v for k,v in qp_kwargs.items() if v is not None})
-    except ValueError as e:
-        # User-friendly error messages
-        raise HTTPException(400, str(e))
-    except Exception as e:
-        # Internal errors
-        raise HTTPException(500, f"Query failed: {str(e)}")
+    # Schedule background processing
+    background_tasks.add_task(
+        process_message_query,
+        message_id=m_user.id,
+        session_id=sid,
+        prompt=prompt,
+        graph_dir=_graph_dir(sid),
+        qp_kwargs=qp_kwargs
+    )
 
-    m_asst = Message(session_id=sid, role=Role.assistant, content={"text": answer})
-    db.add(m_asst); db.commit(); db.refresh(m_asst)
-
-    return {"message": {"id": m_asst.id, "role": "assistant", "content": m_asst.content}}
+    return {"message_id": m_user.id, "status": "processing"}
 
 @router.post(
     "/stream",
@@ -248,7 +260,7 @@ async def create_message(sid: str = Query(..., description="Session ID"), payloa
         404: {"description": "Session not found"}
     }
 )
-async def create_message_stream(sid: str = Query(..., description="Session ID"), payload: dict = None, db: DBSession = Depends(get_db)):
+async def create_message_stream(sid: int = Query(..., description="Session ID"), payload: dict = None, db: DBSession = Depends(get_db)):
     """Query with SSE streaming response"""
     sess = db.get(SessionModel, sid)
     if not sess:

@@ -1,14 +1,10 @@
 
-import uuid
 from datetime import datetime
 from sqlalchemy import String, DateTime, Enum, ForeignKey, JSON, Text, Integer
 from sqlalchemy.orm import relationship, Mapped, mapped_column
 import enum
 
 from .db import Base
-
-def gen_id(prefix: str) -> str:
-    return f"{prefix}_{uuid.uuid4().hex[:12]}"
 
 class DocSource(str, enum.Enum):
     upload = "upload"
@@ -29,7 +25,7 @@ class Role(str, enum.Enum):
 
 class Session(Base):
     __tablename__ = "sessions"
-    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: gen_id("sess"))
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     title: Mapped[str] = mapped_column(String, nullable=False)
     graph_dir: Mapped[str] = mapped_column(String, nullable=False)
     settings: Mapped[dict] = mapped_column(JSON, default=dict)
@@ -41,8 +37,8 @@ class Session(Base):
 
 class Document(Base):
     __tablename__ = "documents"
-    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: gen_id("doc"))
-    session_id: Mapped[str] = mapped_column(String, ForeignKey("sessions.id", ondelete="CASCADE"), index=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    session_id: Mapped[int] = mapped_column(Integer, ForeignKey("sessions.id", ondelete="CASCADE"), index=True)
     source_type: Mapped[DocSource] = mapped_column(Enum(DocSource), nullable=False)
     title: Mapped[str | None] = mapped_column(String, nullable=True)
     arxiv_id: Mapped[str | None] = mapped_column(String, nullable=True)
@@ -60,8 +56,8 @@ class Document(Base):
 
 class Message(Base):
     __tablename__ = "messages"
-    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: gen_id("msg"))
-    session_id: Mapped[str] = mapped_column(String, ForeignKey("sessions.id", ondelete="CASCADE"), index=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    session_id: Mapped[int] = mapped_column(Integer, ForeignKey("sessions.id", ondelete="CASCADE"), index=True)
     role: Mapped[Role] = mapped_column(Enum(Role), nullable=False)
     content: Mapped[dict] = mapped_column(JSON, nullable=False)
     token_usage: Mapped[dict | None] = mapped_column(JSON, nullable=True)

@@ -7,7 +7,7 @@ class SessionCreate(BaseModel):
     settings: dict | None = None
 
 class SessionOut(BaseModel):
-    id: str
+    id: int
     title: str
     settings: dict
     stats: dict | None = None

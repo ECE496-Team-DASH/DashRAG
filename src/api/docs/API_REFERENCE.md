@@ -24,7 +24,7 @@ Represents an isolated chat context with its own knowledge graph.
 
 ```json
 {
-  "id": "sess_xxxxxxxxxxxx",
+  "id": 1,
   "title": "string",
   "settings": {},
   "stats": {
@@ -35,7 +35,7 @@ Represents an isolated chat context with its own knowledge graph.
 ```
 
 **Fields:**
-- `id` (string, read-only): Unique session identifier (format: `sess_` + 12 hex chars)
+- `id` (integer, read-only): Unique session identifier (auto-incrementing)
 - `title` (string): Human-readable session name
 - `settings` (object): Custom session configuration (future use)
 - `stats` (object, read-only): Computed statistics about the session
@@ -48,8 +48,8 @@ Represents a PDF document added to a session's knowledge graph.
 
 ```json
 {
-  "id": "doc_xxxxxxxxxxxx",
-  "session_id": "sess_xxxxxxxxxxxx",
+  "id": 1,
+  "session_id": 1,
   "title": "paper_name.pdf",
   "source_type": "upload",
   "status": "ready",
@@ -62,8 +62,8 @@ Represents a PDF document added to a session's knowledge graph.
 ```
 
 **Fields:**
-- `id` (string, read-only): Unique document identifier (format: `doc_` + 12 hex chars)
-- `session_id` (string): Parent session ID
+- `id` (integer, read-only): Unique document identifier (auto-incrementing)
+- `session_id` (integer): Parent session ID
 - `title` (string): Document title
 - `source_type` (enum): `"upload"` or `"arxiv"`
 - `status` (enum): Document processing status
@@ -86,8 +86,8 @@ Represents a message in the chat history.
 
 ```json
 {
-  "id": "msg_xxxxxxxxxxxx",
-  "session_id": "sess_xxxxxxxxxxxx",
+  "id": 1,
+  "session_id": 1,
   "role": "user",
   "content": {
     "text": "What are the main findings?"
@@ -102,8 +102,8 @@ Represents a message in the chat history.
 ```
 
 **Fields:**
-- `id` (string, read-only): Unique message identifier (format: `msg_` + 12 hex chars)
-- `session_id` (string): Parent session ID
+- `id` (integer, read-only): Unique message identifier (auto-incrementing)
+- `session_id` (integer): Parent session ID
 - `role` (enum): Message sender
   - `"user"`: User question/prompt
   - `"assistant"`: AI-generated response

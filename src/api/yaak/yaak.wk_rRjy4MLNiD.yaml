@@ -2,12 +2,12 @@ type: workspace
 model: workspace
 id: wk_rRjy4MLNiD
 createdAt: 2025-11-01T02:03:29.130141200
-updatedAt: 2025-11-01T02:03:29.130142100
+updatedAt: 2025-11-16T04:20:03.024245
 authentication: {}
 authenticationType: null
 description: ''
 headers: []
-name: Yaak
+name: DashRAG
 encryptionKeyChallenge: null
 settingValidateCertificates: true
 settingFollowRedirects: true

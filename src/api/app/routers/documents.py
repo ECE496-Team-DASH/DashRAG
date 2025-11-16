@@ -1,5 +1,5 @@
 
-from fastapi import APIRouter, UploadFile, File, HTTPException, Depends, Query
+from fastapi import APIRouter, UploadFile, File, HTTPException, Depends, Query, BackgroundTasks
 from sqlalchemy.orm import Session as DBSession
 from pathlib import Path
 import logging
@@ -10,6 +10,7 @@ from ..models import Session as SessionModel, Document, DocSource, DocStatus
 from ..utils.pdf_utils import extract_text
 from ..utils.arxiv_utils import search_arxiv, download_pdf
 from ..services.graphrag_service import DashRAGService
+from ..services.background_tasks import process_uploaded_document, process_arxiv_document
 from ..utils.locks import session_lock
 from ..config import settings
 
@@ -28,13 +29,13 @@ def get_db():
     finally:
         db.close()
 
-def _session_root(sid: str) -> Path:
-    return settings.data_root / "sessions" / sid
-def _uploads_dir(sid: str) -> Path:
+def _session_root(sid: int) -> Path:
+    return settings.data_root / "sessions" / str(sid)
+def _uploads_dir(sid: int) -> Path:
     return _session_root(sid) / "uploads"
-def _lock_file(sid: str) -> Path:
+def _lock_file(sid: int) -> Path:
     return _session_root(sid) / ".lock"
-def _graph_dir(sid: str) -> Path:
+def _graph_dir(sid: int) -> Path:
     return _session_root(sid) / "graph"
 
 @router.get(
@@ -63,7 +64,7 @@ def _graph_dir(sid: str) -> Path:
                 "application/json": {
                     "example": [
                         {
-                            "id": "doc_abc123def456",
+                            "id": 1,
                             "title": "transformer_paper.pdf",
                             "source_type": "upload",
                             "status": "ready",
@@ -71,7 +72,7 @@ def _graph_dir(sid: str) -> Path:
                             "pages": 15
                         },
                         {
-                            "id": "doc_xyz789uvw012",
+                            "id": 2,
                             "title": "Attention Is All You Need",
                             "source_type": "arxiv",
                             "status": "ready",
@@ -84,7 +85,7 @@ def _graph_dir(sid: str) -> Path:
         }
     }
 )
-def list_docs(sid: str = Query(..., description="Session ID"), db: DBSession = Depends(get_db)):
+def list_docs(sid: int = Query(..., description="Session ID"), db: DBSession = Depends(get_db)):
     """List all documents in a session"""
     if not db.get(SessionModel, sid):
         raise HTTPException(404, "Session not found")
@@ -97,17 +98,20 @@ def list_docs(sid: str = Query(..., description="Session ID"), db: DBSession = D
 @router.post(
     "/upload", 
     response_model=dict,
-    status_code=200,
+    status_code=202,
     summary="Upload PDF document",
     description="""
-    Upload a PDF file and add it to the session's knowledge graph.
+    Upload a PDF file for asynchronous processing and knowledge graph insertion.
     
     **Process:**
     1. File is saved to session's uploads directory
-    2. Text is extracted from PDF
-    3. Entities and relationships are extracted
-    4. Knowledge graph is updated
-    5. Status changes: `inserting` → `ready` (or `error`)
+    2. Document record created with status `inserting`
+    3. 202 Accepted response returned immediately
+    4. Background processing:
+       - Text extracted from PDF
+       - Entities and relationships extracted
+       - Knowledge graph updated
+       - Status changes: `inserting` → `ready` (or `error`)
     
     **Request:** Multipart form-data with `file` field
     
@@ -116,16 +120,16 @@ def list_docs(sid: str = Query(..., description="Session ID"), db: DBSession = D
     **Query parameters:**
     - `sid`: Session ID
     
-    **Note:** This is a synchronous operation that may take several seconds for large PDFs.
+    **Use GET /documents?sid={sid} to check document status**
     """,
     responses={
-        200: {
-            "description": "Document uploaded and processed",
+        202: {
+            "description": "Document accepted for processing",
             "content": {
                 "application/json": {
                     "example": {
-                        "id": "doc_abc123def456",
-                        "status": "ready",
+                        "id": 1,
+                        "status": "inserting",
                         "title": "my_research_paper.pdf"
                     }
                 }
@@ -135,8 +139,13 @@ def list_docs(sid: str = Query(..., description="Session ID"), db: DBSession = D
         404: {"description": "Session not found"}
     }
 )
-async def upload_pdf(sid: str = Query(..., description="Session ID"), file: UploadFile = File(...), db: DBSession = Depends(get_db)):
-    """Upload a PDF and add it to the knowledge graph"""
+async def upload_pdf(
+    background_tasks: BackgroundTasks,
+    sid: int = Query(..., description="Session ID"),
+    file: UploadFile = File(...),
+    db: DBSession = Depends(get_db)
+):
+    """Upload a PDF and process it in the background"""
     logger.info(f"Uploading PDF '{file.filename}' to session {sid}")
     sess = db.get(SessionModel, sid)
     if not sess:
@@ -144,9 +153,12 @@ async def upload_pdf(sid: str = Query(..., description="Session ID"), file: Uplo
     if not file.filename.lower().endswith(".pdf"):
         raise HTTPException(400, "Only PDF files are supported")
 
-    uploads = _uploads_dir(sid); uploads.mkdir(parents=True, exist_ok=True)
+    uploads = _uploads_dir(sid)
+    uploads.mkdir(parents=True, exist_ok=True)
     doc = Document(session_id=sid, source_type=DocSource.upload, status=DocStatus.inserting, title=file.filename)
-    db.add(doc); db.commit(); db.refresh(doc)
+    db.add(doc)
+    db.commit()
+    db.refresh(doc)
 
     try:
         pdf_path = uploads / f"{doc.id}.pdf"
@@ -154,32 +166,27 @@ async def upload_pdf(sid: str = Query(..., description="Session ID"), file: Uplo
         pdf_path.write_bytes(data)
         doc.local_pdf_path = str(pdf_path)
         db.commit()
-        logger.info(f"PDF saved to {pdf_path}")
-
-        text, pages = extract_text(pdf_path)
-        doc.pages = pages; db.commit()
-        logger.info(f"Extracted {pages} pages from PDF")
-
-        graph_dir = _graph_dir(sid); graph_dir.mkdir(parents=True, exist_ok=True)
-        with session_lock(_lock_file(sid)):
-            try:
-                await DashRAGService(graph_dir).insert_texts(text)
-                doc.status = DocStatus.ready
-                logger.info(f"Document {doc.id} successfully inserted into knowledge graph")
-            except Exception as e:
-                error_msg = f"GraphRAG insertion failed: {str(e)}"
-                logger.error(error_msg, exc_info=True)
-                doc.status = DocStatus.error
-                doc.insert_log = f"{error_msg}\n\nTraceback:\n{traceback.format_exc()}"
-            db.commit()
+        logger.info(f"PDF saved to {pdf_path}, scheduling background processing")
+        
+        # Schedule background processing
+        background_tasks.add_task(
+            process_uploaded_document,
+            doc_id=doc.id,
+            session_id=sid,
+            pdf_path=pdf_path,
+            graph_dir=_graph_dir(sid),
+            lock_file=_lock_file(sid)
+        )
+        
+        return {"id": doc.id, "status": doc.status.value, "title": doc.title}
+        
     except Exception as e:
-        error_msg = f"Failed to process PDF: {str(e)}"
+        error_msg = f"Failed to save PDF: {str(e)}"
         logger.error(error_msg, exc_info=True)
         doc.status = DocStatus.error
         doc.insert_log = f"{error_msg}\n\nTraceback:\n{traceback.format_exc()}"
         db.commit()
-
-    return {"id": doc.id, "status": doc.status.value, "title": doc.title}
+        raise HTTPException(500, error_msg)
 
 @router.get(
     "/search-arxiv", 
@@ -218,7 +225,7 @@ async def upload_pdf(sid: str = Query(..., description="Session ID"), file: Uplo
         }
     }
 )
-def preview_arxiv(sid: str = Query(..., description="Session ID"), query: str = Query(..., description="Search query"), max_results: int = Query(5, description="Maximum number of results"), db: DBSession = Depends(get_db)):
+def preview_arxiv(sid: int = Query(..., description="Session ID"), query: str = Query(..., description="Search query"), max_results: int = Query(5, description="Maximum number of results"), db: DBSession = Depends(get_db)):
     """Preview arXiv search results without adding documents"""
     if not db.get(SessionModel, sid):
         raise HTTPException(404, "Session not found")
@@ -228,16 +235,19 @@ def preview_arxiv(sid: str = Query(..., description="Session ID"), query: str = 
 @router.post(
     "/add-arxiv", 
     response_model=dict,
-    status_code=200,
+    status_code=202,
     summary="Add arXiv paper to session",
     description="""
-    Download an arXiv paper and add it to the session's knowledge graph.
+    Download and process an arXiv paper asynchronously.
     
     **Process:**
-    1. Download PDF from arXiv
-    2. Extract text
-    3. Build knowledge graph
-    4. Status transitions: `downloading` → `inserting` → `ready` (or `error`)
+    1. Document record created with status `downloading`
+    2. 202 Accepted response returned immediately
+    3. Background processing:
+       - Download PDF from arXiv
+       - Extract text
+       - Build knowledge graph
+       - Status transitions: `downloading` → `inserting` → `ready` (or `error`)
     
     **Request body:**
     ```json
@@ -253,16 +263,16 @@ def preview_arxiv(sid: str = Query(..., description="Session ID"), query: str = 
     - `1706.03762` (new format)
     - `cs/0703001` (old format)
     
-    **Note:** This is synchronous and may take 10-30 seconds depending on paper size.
+    **Use GET /documents?sid={sid} to check document status**
     """,
     responses={
-        200: {
-            "description": "Paper added successfully",
+        202: {
+            "description": "Paper accepted for processing",
             "content": {
                 "application/json": {
                     "example": {
-                        "id": "doc_xyz789uvw012",
-                        "status": "ready",
+                        "id": 2,
+                        "status": "downloading",
                         "arxiv_id": "1706.03762"
                     }
                 }
@@ -272,8 +282,13 @@ def preview_arxiv(sid: str = Query(..., description="Session ID"), query: str = 
         404: {"description": "Session not found or arXiv paper not found"}
     }
 )
-async def add_arxiv(sid: str = Query(..., description="Session ID"), payload: dict = None, db: DBSession = Depends(get_db)):
-    """Download and add an arXiv paper to the knowledge graph"""
+async def add_arxiv(
+    background_tasks: BackgroundTasks,
+    sid: int = Query(..., description="Session ID"),
+    payload: dict = None,
+    db: DBSession = Depends(get_db)
+):
+    """Download and process an arXiv paper in the background"""
     logger.info(f"Adding arXiv paper to session {sid}")
     sess = db.get(SessionModel, sid)
     if not sess:
@@ -282,38 +297,23 @@ async def add_arxiv(sid: str = Query(..., description="Session ID"), payload: di
     if not arxiv_id:
         raise HTTPException(400, "arxiv_id is required")
 
-    uploads = _uploads_dir(sid); uploads.mkdir(parents=True, exist_ok=True)
+    uploads = _uploads_dir(sid)
+    uploads.mkdir(parents=True, exist_ok=True)
     doc = Document(session_id=sid, source_type=DocSource.arxiv, status=DocStatus.downloading, arxiv_id=arxiv_id)
-    db.add(doc); db.commit(); db.refresh(doc)
-    logger.info(f"Created document record {doc.id} for arXiv paper {arxiv_id}")
-
-    try:
-        pdf_path = Path(download_pdf(arxiv_id, uploads))
-        doc.local_pdf_path = str(pdf_path); doc.status = DocStatus.inserting
-        db.commit()
-        logger.info(f"Downloaded arXiv PDF to {pdf_path}")
-
-        text, pages = extract_text(pdf_path)
-        doc.pages = pages; db.commit()
-        logger.info(f"Extracted {pages} pages from arXiv PDF")
-
-        graph_dir = _graph_dir(sid); graph_dir.mkdir(parents=True, exist_ok=True)
-        with session_lock(_lock_file(sid)):
-            try:
-                await DashRAGService(graph_dir).insert_texts(text)
-                doc.status = DocStatus.ready
-                logger.info(f"Document {doc.id} (arXiv: {arxiv_id}) successfully inserted into knowledge graph")
-            except Exception as e:
-                error_msg = f"GraphRAG insertion failed: {str(e)}"
-                logger.error(error_msg, exc_info=True)
-                doc.status = DocStatus.error
-                doc.insert_log = f"{error_msg}\n\nTraceback:\n{traceback.format_exc()}"
-            db.commit()
-    except Exception as e:
-        error_msg = f"Failed to process arXiv paper {arxiv_id}: {str(e)}"
-        logger.error(error_msg, exc_info=True)
-        doc.status = DocStatus.error
-        doc.insert_log = f"{error_msg}\n\nTraceback:\n{traceback.format_exc()}"
-        db.commit()
-
+    db.add(doc)
+    db.commit()
+    db.refresh(doc)
+    logger.info(f"Created document record {doc.id} for arXiv paper {arxiv_id}, scheduling background processing")
+    
+    # Schedule background processing
+    background_tasks.add_task(
+        process_arxiv_document,
+        doc_id=doc.id,
+        session_id=sid,
+        arxiv_id=arxiv_id,
+        uploads_dir=uploads,
+        graph_dir=_graph_dir(sid),
+        lock_file=_lock_file(sid)
+    )
+    
     return {"id": doc.id, "status": doc.status.value, "arxiv_id": arxiv_id}

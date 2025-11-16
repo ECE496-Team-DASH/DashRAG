@@ -2,7 +2,7 @@ type: http_request
 model: http_request
 id: rq_B7Z2awXZHF
 createdAt: 2025-11-01T16:57:06.375386300
-updatedAt: 2025-11-01T23:11:47.676103600
+updatedAt: 2025-11-16T04:49:16.239602200
 workspaceId: wk_rRjy4MLNiD
 folderId: fl_5sRi6UVWDX
 authentication: {}
@@ -10,8 +10,8 @@ authenticationType: null
 body:
   text: |-
     {
-        "content": "what is common between octants and medical RAG?",
-        "mode": "global",
+        "content": "what is M-Eval?",
+        "mode": "local",
         "top_k": 10
     }
 bodyType: application/json
@@ -28,9 +28,9 @@ url: ${[ BASE_URL ]}/messages
 urlParameters:
 - enabled: true
   name: sid
-  value: sess_8c85746b97f0
+  value: '2'
   id: 9mjZqiPvGt
 - enabled: true
   name: ''
   value: ''
-  id: bT5hQEdbzq
+  id: waw7a5tHQQ

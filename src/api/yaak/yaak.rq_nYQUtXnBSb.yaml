@@ -2,7 +2,7 @@ type: http_request
 model: http_request
 id: rq_nYQUtXnBSb
 createdAt: 2025-11-01T03:16:05.403083700
-updatedAt: 2025-11-01T23:12:51.105011200
+updatedAt: 2025-11-16T04:25:52.767550700
 workspaceId: wk_rRjy4MLNiD
 folderId: fl_4gEtSFTJny
 authentication: {}
@@ -26,9 +26,9 @@ url: ${[ BASE_URL ]}/documents/add-arxiv
 urlParameters:
 - enabled: true
   name: sid
-  value: sess_8c85746b97f0
+  value: '1'
   id: ZmVNugy7es
 - enabled: true
   name: ''
   value: ''
-  id: 2ziu5FtncV
+  id: aU5Eghzg8A

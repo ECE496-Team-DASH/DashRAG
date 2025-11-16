@@ -2,7 +2,7 @@ type: http_request
 model: http_request
 id: rq_7UL92rCXfD
 createdAt: 2025-11-01T03:07:16.588638700
-updatedAt: 2025-11-01T16:41:27.002660200
+updatedAt: 2025-11-16T04:27:04.065446300
 workspaceId: wk_rRjy4MLNiD
 folderId: fl_tUFZJQ4bqo
 authentication: {}
@@ -19,9 +19,9 @@ url: ${[ BASE_URL ]}/sessions
 urlParameters:
 - enabled: true
   name: sid
-  value: sess_f2fbbf3c4770
+  value: '1'
   id: ETV3t7cwBG
 - enabled: true
   name: ''
   value: ''
-  id: h9FyYK6ujr
+  id: RI7GD8ruCJ
