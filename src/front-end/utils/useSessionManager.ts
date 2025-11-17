@@ -11,6 +11,8 @@ export const useSessionManager = () => {
   const [creatingSession, setCreatingSession] = useState(false);
   const [showNameModal, setShowNameModal] = useState(false);
   const [newSessionName, setNewSessionName] = useState("");
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [sessionToDelete, setSessionToDelete] = useState<Session | null>(null);
 
   useEffect(() => {
     loadSessions();
@@ -39,9 +41,21 @@ export const useSessionManager = () => {
     setShowNameModal(false);
     try {
       setCreatingSession(true);
+      
       // Use "New Chat" as default if name is empty or just whitespace
-      const title = newSessionName.trim() || "New Chat";
-      const newSession = await dashragAPI.createSession(title);
+      let title = newSessionName.trim() || "New Chat";
+      
+      // Check if session name already exists and find a unique name
+      const existingTitles = sessions.map(session => session.title.toLowerCase());
+      let finalTitle = title;
+      let counter = 1;
+      
+      while (existingTitles.includes(finalTitle.toLowerCase())) {
+        finalTitle = `${title}(${counter})`;
+        counter++;
+      }
+
+      const newSession = await dashragAPI.createSession(finalTitle);
       
       localStorage.setItem("dashrag_session_id", newSession.id.toString());
       router.push("/chat");
@@ -59,26 +73,40 @@ export const useSessionManager = () => {
   };
 
   const handleDeleteSession = async (sessionId: string | number) => {
-    if (!confirm("Are you sure you want to delete this chat? This action cannot be undone.")) {
+    const session = sessions.find(s => s.id === sessionId);
+    if (!session) {
       return;
     }
+    
+    setSessionToDelete(session);
+    setShowDeleteModal(true);
+  };
 
+  const confirmDelete = async () => {
+    if (!sessionToDelete) return;
+    
+    setShowDeleteModal(false);
+    
     try {
-      // Actually delete from the API/database
-      await dashragAPI.deleteSession(sessionId);
+      await dashragAPI.deleteSession(sessionToDelete.id);
       
-      // Remove from UI state after successful deletion
-      setSessions(prev => prev.filter(session => session.id !== sessionId));
+      setSessions(prev => prev.filter(session => session.id !== sessionToDelete.id));
       
-      // Clear localStorage if this was the active session
       const currentSessionId = localStorage.getItem("dashrag_session_id");
-      if (currentSessionId === sessionId.toString()) {
+      if (currentSessionId === sessionToDelete.id.toString()) {
         localStorage.removeItem("dashrag_session_id");
       }
     } catch (err: any) {
       console.error("Failed to delete session:", err);
       alert(err.message || "Failed to delete chat");
+    } finally {
+      setSessionToDelete(null);
     }
+  };
+
+  const cancelDelete = () => {
+    setShowDeleteModal(false);
+    setSessionToDelete(null);
   };
 
   const handleCloseModal = () => {
@@ -97,6 +125,8 @@ export const useSessionManager = () => {
     creatingSession,
     showNameModal,
     newSessionName,
+    showDeleteModal,
+    sessionToDelete,
     
     // Actions
     loadSessions,
@@ -106,5 +136,7 @@ export const useSessionManager = () => {
     handleDeleteSession,
     handleCloseModal,
     handleSessionNameChange,
+    confirmDelete,
+    cancelDelete,
   };
 };

@@ -2,6 +2,7 @@ import { Footer } from "@/components/Layout/Footer";
 import { Navbar } from "@/components/Layout/Navbar";
 import { DraggableChatCard } from "@/components/Home/DraggableChatCard";
 import { SessionNameModal } from "@/components/Home/SessionNameModal";
+import { DeleteConfirmationModal } from "@/components/Home/DeleteConfirmationModal";
 import { EmptyState } from "@/components/Home/EmptyState";
 import { useSessionManager } from "@/utils/useSessionManager";
 import { useState } from "react";
@@ -27,6 +28,8 @@ export default function Home() {
     creatingSession,
     showNameModal,
     newSessionName,
+    showDeleteModal,
+    sessionToDelete,
 
     // Actions
     loadSessions,
@@ -36,6 +39,8 @@ export default function Home() {
     handleDeleteSession,
     handleCloseModal,
     handleSessionNameChange,
+    confirmDelete,
+    cancelDelete,
   } = useSessionManager();
 
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -173,7 +178,7 @@ export default function Home() {
             </div>
 
             {/* Chat Cards Area */}
-            <div className="relative bg-white rounded-lg border border-gray-200 min-h-[600px] p-6">
+            <div className="bg-white rounded-lg border border-gray-200 min-h-[600px] max-h-[600px] overflow-y-auto">
               <EmptyState
                 loading={loading}
                 error={error}
@@ -185,30 +190,41 @@ export default function Home() {
 
               {sessions.length > 0 && (
                 <>
-                  <div className="absolute top-4 right-4 text-sm text-gray-500">
-                    💡 Drag the cards around to organize them
+                  {/* Header with tip and count */}
+                  <div className="sticky top-0 bg-white z-10 p-6 pb-4 border-b border-gray-100">
+                    <div className="flex items-center justify-between text-sm text-gray-500">
+                      <span>💡 Drag the cards around to organize them</span>
+                      <span className="bg-gray-100 px-2 py-1 rounded-full text-xs font-medium">
+                        {sessions.length} session{sessions.length !== 1 ? 's' : ''}
+                      </span>
+                    </div>
                   </div>
 
-                  <DndContext
-                    sensors={sensors}
-                    collisionDetection={closestCenter}
-                    onDragStart={handleDragStart}
-                    onDragEnd={handleDragEnd}
-                  >
-                    {sessions.map((session, index) => (
-                      <DraggableChatCard
-                        key={session.id}
-                        session={session}
-                        index={index}
-                        onSelect={handleSelectSession}
-                        onDelete={handleDeleteSession}
-                      />
-                    ))}
+                  {/* Chat cards in grid */}
+                  <div className="p-6 pt-4">
+                    <DndContext
+                      sensors={sensors}
+                      collisionDetection={closestCenter}
+                      onDragStart={handleDragStart}
+                      onDragEnd={handleDragEnd}
+                    >
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {sessions.map((session, index) => (
+                          <DraggableChatCard
+                            key={session.id}
+                            session={session}
+                            index={index}
+                            onSelect={handleSelectSession}
+                            onDelete={handleDeleteSession}
+                          />
+                        ))}
+                      </div>
 
-                    <DragOverlay>
-                      {getDragOverlayContent()}
-                    </DragOverlay>
-                  </DndContext>
+                      <DragOverlay>
+                        {getDragOverlayContent()}
+                      </DragOverlay>
+                    </DndContext>
+                  </div>
                 </>
               )}
             </div>
@@ -222,6 +238,13 @@ export default function Home() {
           onClose={handleCloseModal}
           onSessionNameChange={handleSessionNameChange}
           onCreateSession={handleCreateWithName}
+        />
+
+        <DeleteConfirmationModal
+          isOpen={showDeleteModal}
+          sessionTitle={sessionToDelete?.title || ""}
+          onConfirm={confirmDelete}
+          onCancel={cancelDelete}
         />
 
         <Footer />

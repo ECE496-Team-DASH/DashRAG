@@ -28,17 +28,6 @@ export const DraggableChatCard = ({
   const documentCount = session.stats?.document_count ?? 0;
   const messageCount = session.stats?.message_count ?? 0;
 
-  // Simple grid positioning: 3 cards per row
-  const cardsPerRow = 3;
-  const cardWidth = 300; 
-  const cardHeight = 280; 
-  const startOffset = 20;
-
-  const gridPosition = {
-    x: startOffset + (index % cardsPerRow) * cardWidth,
-    y: startOffset + Math.floor(index / cardsPerRow) * cardHeight
-  };
-
   const {
     attributes,
     listeners,
@@ -51,22 +40,19 @@ export const DraggableChatCard = ({
 
   const style = {
     transform: CSS.Translate.toString(transform),
-    position: 'absolute' as const,
-    left: gridPosition.x,
-    top: gridPosition.y,
   };
 
   return (
     <div
       ref={setNodeRef}
       style={style}
-      className={`bg-white rounded-lg shadow-lg border border-gray-200 p-4 w-64 hover:shadow-xl transition-shadow duration-200 ${
+      className={`bg-white rounded-lg shadow-lg border border-gray-200 p-4 hover:shadow-xl transition-shadow duration-200 ${
         isDragging ? 'opacity-50' : ''
       }`}
     >
-      <div className="mb-3" {...listeners} {...attributes}>
-        <div className="flex items-center justify-between cursor-move">
-          <div className="flex items-center gap-2">
+      <div className="mb-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 cursor-move flex-1" {...listeners} {...attributes}>
             <div className="w-2 h-2 bg-green-500 rounded-full"></div>
             <h3 className="font-semibold text-gray-800 truncate flex-1">
               {session.title}
@@ -75,9 +61,11 @@ export const DraggableChatCard = ({
           <button
             onClick={(e) => {
               e.stopPropagation();
+              e.preventDefault();
               onDelete(session.id);
             }}
-            className="text-gray-400 hover:text-red-500 text-sm p-1 cursor-pointer"
+            className="text-gray-400 hover:text-red-500 text-sm p-1 cursor-pointer ml-2"
+            type="button"
           >
             ✕
           </button>
