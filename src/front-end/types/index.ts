@@ -20,11 +20,13 @@ export interface Session {
   id: string;
   title: string;
   settings: Record<string, any>;
-  stats: {
-    document_count: number;
-    message_count: number;
+  stats?: {
+    document_count?: number;
+    message_count?: number;
+    graph_exists?: boolean;
   };
   created_at: string;
+  updated_at: string;
 }
 
 export interface Document {

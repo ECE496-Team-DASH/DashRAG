@@ -1,4 +1,3 @@
-
 from fastapi import APIRouter, HTTPException, Depends, Query
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session as DBSession
@@ -6,7 +5,7 @@ from pathlib import Path
 import shutil, tempfile
 
 from ..db import SessionLocal
-from ..models import Session as SessionModel
+from ..models import Session as SessionModel, Document as DocumentModel, Message as MessageModel
 from ..config import settings
 
 router = APIRouter(
@@ -110,7 +109,26 @@ def create_session(payload: dict, db: DBSession = Depends(get_db)):
 def list_sessions(db: DBSession = Depends(get_db)):
     """Get all sessions ordered by creation date"""
     rows = db.query(SessionModel).order_by(SessionModel.created_at.desc()).all()
-    return [{"id": r.id, "title": r.title, "settings": r.settings} for r in rows]
+    
+    result = []
+    for r in rows:
+        # Count documents and messages for this session
+        doc_count = db.query(DocumentModel).filter_by(session_id=r.id).count()
+        msg_count = db.query(MessageModel).filter_by(session_id=r.id).count()
+        
+        result.append({
+            "id": r.id,
+            "title": r.title,
+            "settings": r.settings,
+            "created_at": r.updated_at.isoformat(),
+            "stats": {
+                "document_count": doc_count,
+                "message_count": msg_count,
+                "graph_exists": Path(r.graph_dir).exists()
+            }
+        })
+    
+    return result
 
 @router.get(
     "/detail", 

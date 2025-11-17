@@ -40,6 +40,16 @@ export const dashragAPI = {
     return response.json();
   },
 
+  async deleteSession(sessionId: string | number): Promise<void> {
+    const response = await fetch(`${API_BASE_URL}/sessions?sid=${sessionId}`, {
+      method: "DELETE",
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Failed to delete session: ${response.statusText}`);
+    }
+  },
+
   // Document Management
   async uploadDocument(sessionId: string, file: File): Promise<Document> {
     const formData = new FormData();
