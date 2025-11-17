@@ -56,7 +56,7 @@ export const EmptyState = ({
             disabled={creatingSession}
             className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-medium py-2 px-6 rounded-lg"
           >
-            {creatingSession ? "Creating..." : "Create First Chat"}
+            {creatingSession ? "Creating..." : "New Chat"}
           </button>
         </div>
       </div>

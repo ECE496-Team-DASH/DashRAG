@@ -4,7 +4,19 @@ import { DraggableChatCard } from "@/components/Home/DraggableChatCard";
 import { SessionNameModal } from "@/components/Home/SessionNameModal";
 import { EmptyState } from "@/components/Home/EmptyState";
 import { useSessionManager } from "@/utils/useSessionManager";
+import { useState } from "react";
 import Head from "next/head";
+import {
+  DndContext,
+  DragOverlay,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragStartEvent,
+  DragEndEvent,
+} from "@dnd-kit/core";
 
 export default function Home() {
   const {
@@ -15,7 +27,7 @@ export default function Home() {
     creatingSession,
     showNameModal,
     newSessionName,
-    
+
     // Actions
     loadSessions,
     handleCreateNewChat,
@@ -26,6 +38,85 @@ export default function Home() {
     handleSessionNameChange,
   } = useSessionManager();
 
+  const [activeId, setActiveId] = useState<string | null>(null);
+
+  // Configure sensors for better drag experience
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
+    useSensor(KeyboardSensor)
+  );
+
+  function handleDragStart(event: DragStartEvent) {
+    setActiveId(event.active.id as string);
+  }
+
+  function handleDragEnd(event: DragEndEvent) {
+    // For now, just clear the activeId - you can add your own logic here
+    setActiveId(null);
+  }
+
+  const getDragOverlayContent = () => {
+    if (!activeId) return null;
+
+    // Find the session being dragged
+    const session = sessions.find(s => s.id.toString() === activeId);
+
+    if (session) {
+      const documentCount = session.stats?.document_count ?? 0;
+      const messageCount = session.stats?.message_count ?? 0;
+      
+      const formatDate = (dateString: string) => {
+        const date = new Date(dateString);
+        return date.toLocaleDateString('en-US', {
+          month: 'short',
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        });
+      };
+
+      return (
+        <div className="bg-white rounded-lg shadow-xl border-2 border-blue-300 p-4 w-64 opacity-90">
+          <div className="mb-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                <h3 className="font-semibold text-gray-800 truncate flex-1">
+                  {session.title}
+                </h3>
+              </div>
+              <div className="text-gray-400 text-sm">✕</div>
+            </div>
+          </div>
+          
+          <div className="space-y-2 mb-4">
+            <div className="flex justify-between text-sm text-gray-600">
+              <span>Documents:</span>
+              <span className="font-medium">{documentCount}</span>
+            </div>
+            <div className="flex justify-between text-sm text-gray-600">
+              <span>Messages:</span>
+              <span className="font-medium">{messageCount}</span>
+            </div>
+            <div className="text-xs text-gray-500">
+              Updated: {formatDate(session.created_at)}
+            </div>
+          </div>
+          
+          <div className="w-full bg-blue-600 text-white py-2 px-4 rounded-md text-sm font-medium text-center">
+            Open Chat
+          </div>
+        </div>
+      );
+    }
+
+    return null;
+  };
+
   return (
     <>
       <Head>
@@ -34,14 +125,8 @@ export default function Home() {
           name="description"
           content="Manage your DashRAG chat sessions with drag-and-drop interface"
         />
-        <meta
-          name="viewport"
-          content="width=device-width, initial-scale=1"
-        />
-        <link
-          rel="icon"
-          href="/favicon.ico"
-        />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <link rel="icon" href="/favicon.ico" />
       </Head>
 
       <div className="flex flex-col min-h-screen bg-gray-50">
@@ -57,7 +142,7 @@ export default function Home() {
               <p className="text-gray-600 mb-4">
                 Drag and drop your chat cards to organize them. Click to open or create new conversations.
               </p>
-              
+
               <div className="flex gap-4">
                 <button
                   onClick={handleCreateNewChat}
@@ -76,7 +161,7 @@ export default function Home() {
                     </>
                   )}
                 </button>
-                
+
                 <button
                   onClick={loadSessions}
                   disabled={loading}
@@ -97,22 +182,33 @@ export default function Home() {
                 onRetry={loadSessions}
                 onCreateFirst={handleCreateNewChat}
               />
-              
+
               {sessions.length > 0 && (
                 <>
                   <div className="absolute top-4 right-4 text-sm text-gray-500">
                     💡 Drag the cards around to organize them
                   </div>
-                  
-                  {sessions.map((session, index) => (
-                    <DraggableChatCard
-                      key={session.id}
-                      session={session}
-                      index={index}
-                      onSelect={handleSelectSession}
-                      onDelete={handleDeleteSession}
-                    />
-                  ))}
+
+                  <DndContext
+                    sensors={sensors}
+                    collisionDetection={closestCenter}
+                    onDragStart={handleDragStart}
+                    onDragEnd={handleDragEnd}
+                  >
+                    {sessions.map((session, index) => (
+                      <DraggableChatCard
+                        key={session.id}
+                        session={session}
+                        index={index}
+                        onSelect={handleSelectSession}
+                        onDelete={handleDeleteSession}
+                      />
+                    ))}
+
+                    <DragOverlay>
+                      {getDragOverlayContent()}
+                    </DragOverlay>
+                  </DndContext>
                 </>
               )}
             </div>
