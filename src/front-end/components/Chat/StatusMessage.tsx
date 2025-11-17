@@ -61,15 +61,16 @@ export const StatusMessage: FC<Props> = ({ status, message, progress }) => {
         <div className="flex-1">
           <div>{message}</div>
           {progress !== undefined && status === "processing" && (
-            <div className="mt-2">
-              <div className="flex items-center gap-2">
-                <div className="flex-1 bg-white rounded-full h-2 overflow-hidden border border-yellow-300">
+            <div className="mt-3">
+              <div className="flex items-center gap-3">
+                <div className="relative flex-1 bg-yellow-200 rounded-full h-2.5 overflow-hidden shadow-inner">
                   <div
-                    className="h-full bg-gradient-to-r from-yellow-400 to-yellow-600 transition-all duration-300"
+                    className="absolute inset-0 bg-yellow-500 rounded-full transition-all duration-300 ease-out"
                     style={{ width: `${progress}%` }}
                   />
+                  <div className="absolute inset-0 shimmer" />
                 </div>
-                <span className="text-xs font-semibold min-w-[3rem] text-right">
+                <span className="text-xs font-bold min-w-[3rem] text-right tabular-nums">
                   {progress}%
                 </span>
               </div>

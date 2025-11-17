@@ -82,4 +82,5 @@ export interface ArXivPaper {
   abstract: string;
   published_at: string;
   pdf_url: string;
+  pdf_size_mb?: number;
 }

@@ -169,12 +169,21 @@ export const Chat: FC<Props> = ({
                         <h4 className="font-semibold text-neutral-800 text-sm mb-1">
                           {paper.title}
                         </h4>
+                        <a 
+                          href={`https://arxiv.org/abs/${paper.arxiv_id}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-blue-600 hover:text-blue-800 hover:underline inline-flex items-center gap-1 mb-1"
+                        >
+                          View on arXiv ↗
+                        </a>
                         <p className="text-xs text-neutral-600 mb-1">
                           {paper.authors.split(',').slice(0, 3).join(',')}
                           {paper.authors.split(',').length > 3 && ', et al.'}
                         </p>
                         <p className="text-xs text-neutral-500 mb-2">
                           arXiv:{paper.arxiv_id} • {new Date(paper.published_at).toLocaleDateString()}
+                          {paper.pdf_size_mb && ` • ${paper.pdf_size_mb} MB`}
                         </p>
                         <p className="text-xs text-neutral-700 line-clamp-2">
                           {paper.abstract}
