@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Session } from "@/types";
 import { useDraggable, useDroppable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
@@ -7,6 +8,7 @@ interface ChatCardProps {
   index: number;
   onSelect: (sessionId: string | number) => void;
   onDelete: (sessionId: string | number) => void;
+  onRename?: (sessionId: string, newName: string) => void;
   isDragDisabled?: boolean;
 }
 
@@ -15,8 +17,12 @@ export const ChatCard = ({
   index, 
   onSelect, 
   onDelete,
+  onRename,
   isDragDisabled = false,
 }: ChatCardProps) => {
+  const [isEditing, setIsEditing] = useState(false);
+  const [editName, setEditName] = useState(session.title);
+
   const { attributes, listeners, setNodeRef: setDragRef, transform, isDragging } = useDraggable({
     id: `session-${session.id}`,
     data: { type: 'session', session },
@@ -39,6 +45,13 @@ export const ChatCard = ({
     });
   };
 
+  const handleRename = () => {
+    if (editName.trim() && editName.trim() !== session.title && onRename) {
+      onRename(session.id, editName.trim());
+    }
+    setIsEditing(false);
+  };
+
   const documentCount = session.stats?.document_count ?? 0;
   const messageCount = session.stats?.message_count ?? 0;
 
@@ -54,7 +67,7 @@ export const ChatCard = ({
         setDropRef(node);
       }}
       style={style}
-      className={`bg-white rounded-lg shadow-lg border-2 p-4 hover:shadow-xl transition-all duration-200 ${
+      className={`bg-white rounded-lg shadow-lg border-2 p-4 hover:shadow-xl transition-all duration-200 self-start ${
         isOver ? 'border-blue-500 bg-blue-50 scale-105' : 'border-gray-200'
       } ${isDragging ? 'cursor-grabbing z-50' : 'cursor-grab'}`}
       {...listeners}
@@ -64,9 +77,43 @@ export const ChatCard = ({
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 flex-1">
             <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-            <h3 className="font-semibold text-gray-800 truncate flex-1">
-              {session.title}
-            </h3>
+            {isEditing ? (
+              <input
+                type="text"
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                onBlur={handleRename}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleRename();
+                  if (e.key === 'Escape') {
+                    setEditName(session.title);
+                    setIsEditing(false);
+                  }
+                }}
+                className="font-semibold text-gray-800 bg-white border rounded px-2 py-1 flex-1"
+                autoFocus
+                onClick={(e) => e.stopPropagation()}
+                onMouseDown={(e) => e.stopPropagation()}
+              />
+            ) : (
+              <h3
+                className="font-semibold text-gray-800 truncate flex-1 cursor-pointer group"
+                onDoubleClick={(e) => {
+                  e.stopPropagation();
+                  if (onRename) {
+                    setEditName(session.title);
+                    setIsEditing(true);
+                  }
+                }}
+              >
+                {session.title}
+                {onRename && (
+                  <span className="block text-xs text-gray-400 font-normal opacity-0 group-hover:opacity-100 transition-opacity">
+                    (double click to edit title)
+                  </span>
+                )}
+              </h3>
+            )}
           </div>
           <button
             onClick={(e) => {

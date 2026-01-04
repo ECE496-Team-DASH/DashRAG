@@ -50,6 +50,22 @@ export const dashragAPI = {
     }
   },
 
+  async renameSession(sessionId: string | number, title: string): Promise<Session> {
+    const response = await fetch(`${API_BASE_URL}/sessions?sid=${sessionId}`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ title }),
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Failed to rename session: ${response.statusText}`);
+    }
+    
+    return response.json();
+  },
+
   // Document Management
   async uploadDocument(sessionId: string, file: File): Promise<Document> {
     const formData = new FormData();

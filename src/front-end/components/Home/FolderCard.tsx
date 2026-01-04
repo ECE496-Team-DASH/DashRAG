@@ -11,6 +11,7 @@ interface FolderCardProps {
   onDeleteFolder: (folderId: string) => void;
   onRenameFolder: (folderId: string, newName: string) => void;
   onRemoveFromFolder: (sessionId: string) => void;
+  onRenameSession?: (sessionId: string, newName: string) => void;
 }
 
 export const FolderCard = ({
@@ -21,6 +22,7 @@ export const FolderCard = ({
   onDeleteFolder,
   onRenameFolder,
   onRemoveFromFolder,
+  onRenameSession,
 }: FolderCardProps) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -31,7 +33,8 @@ export const FolderCard = ({
     data: { type: 'folder', folder },
   });
 
-  const folderSessions = sessions.filter(s => folder.sessionIds.includes(s.id));
+  const folderSessionIds = folder.sessionIds.map(id => String(id));
+  const folderSessions = sessions.filter(s => folderSessionIds.includes(String(s.id)));
 
   const handleRename = () => {
     if (editName.trim()) {
@@ -43,7 +46,7 @@ export const FolderCard = ({
   return (
     <div
       ref={setNodeRef}
-      className={`bg-amber-50 rounded-lg shadow-lg border-2 p-4 transition-all duration-200 ${
+      className={`bg-amber-50 rounded-lg shadow-lg border-2 p-4 transition-all duration-200 self-start ${
         isOver ? 'border-blue-500 bg-blue-50 scale-105' : 'border-amber-300'
       }`}
     >
@@ -63,11 +66,13 @@ export const FolderCard = ({
               />
             ) : (
               <h3
-                className="font-semibold text-gray-800 truncate flex-1 cursor-pointer"
+                className="font-semibold text-gray-800 truncate flex-1 cursor-pointer group"
                 onDoubleClick={() => setIsEditing(true)}
-                title="Double-click to rename"
               >
                 {folder.name}
+                <span className="block text-xs text-gray-400 font-normal opacity-0 group-hover:opacity-100 transition-opacity">
+                  (double click to edit title)
+                </span>
               </h3>
             )}
           </div>
@@ -107,6 +112,7 @@ export const FolderCard = ({
                 index={index}
                 onSelect={onSelectSession}
                 onDelete={onDeleteSession}
+                onRename={onRenameSession}
                 isDragDisabled={true}
               />
             </div>

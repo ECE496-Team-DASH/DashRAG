@@ -5,6 +5,9 @@ import { dashragAPI } from '@/utils/dashrag-api';
 
 const FOLDERS_STORAGE_KEY = 'dashrag_folders';
 
+// Helper to normalize session ID to string for consistent comparison
+const normalizeId = (id: string | number): string => String(id);
+
 export const useSessionManager = () => {
   const router = useRouter();
   const [sessions, setSessions] = useState<Session[]>([]);
@@ -17,12 +20,27 @@ export const useSessionManager = () => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [sessionToDelete, setSessionToDelete] = useState<Session | null>(null);
 
-  // Load folders from localStorage
-  const loadFolders = () => {
+  // Load folders from localStorage and clean up invalid session references
+  const loadFolders = (currentSessions?: Session[]) => {
     try {
       const stored = localStorage.getItem(FOLDERS_STORAGE_KEY);
       if (stored) {
-        setFolders(JSON.parse(stored));
+        let parsedFolders: Folder[] = JSON.parse(stored);
+        
+        // If we have sessions, clean up folders to only include valid session IDs
+        if (currentSessions && currentSessions.length > 0) {
+          const validSessionIds = new Set(currentSessions.map(s => normalizeId(s.id)));
+          
+          parsedFolders = parsedFolders.map(f => ({
+            ...f,
+            sessionIds: f.sessionIds.filter(id => validSessionIds.has(normalizeId(id)))
+          })).filter(f => f.sessionIds.length >= 2); // Remove folders with less than 2 valid sessions
+          
+          // Save cleaned up folders
+          localStorage.setItem(FOLDERS_STORAGE_KEY, JSON.stringify(parsedFolders));
+        }
+        
+        setFolders(parsedFolders);
       }
     } catch (err) {
       console.error("Failed to load folders:", err);
@@ -36,7 +54,6 @@ export const useSessionManager = () => {
   };
 
   useEffect(() => {
-    loadFolders();
     loadSessions();
   }, []);
 
@@ -46,9 +63,12 @@ export const useSessionManager = () => {
       setError(null);
       const sessionList = await dashragAPI.listSessions();
       setSessions(sessionList);
+      // Load and clean folders after sessions are loaded
+      loadFolders(sessionList);
     } catch (err: any) {
       console.error("Failed to load sessions:", err);
       setError(err.message || "Failed to load sessions");
+      loadFolders(); // Still load folders even if sessions fail
     } finally {
       setLoading(false);
     }
@@ -56,20 +76,26 @@ export const useSessionManager = () => {
 
   // Create a new folder when two sessions are combined
   const createFolder = (session1Id: string, session2Id: string) => {
-    const session1 = sessions.find(s => s.id === session1Id);
-    const session2 = sessions.find(s => s.id === session2Id);
+    const id1 = normalizeId(session1Id);
+    const id2 = normalizeId(session2Id);
+    
+    const session1 = sessions.find(s => normalizeId(s.id) === id1);
+    const session2 = sessions.find(s => normalizeId(s.id) === id2);
     
     if (!session1 || !session2) return;
 
     // Check if either session is already in a folder
     const existingFolder = folders.find(f => 
-      f.sessionIds.includes(session1Id) || f.sessionIds.includes(session2Id)
+      f.sessionIds.some(id => normalizeId(id) === id1) || 
+      f.sessionIds.some(id => normalizeId(id) === id2)
     );
 
     if (existingFolder) {
       // Add the other session to the existing folder
-      const sessionToAdd = existingFolder.sessionIds.includes(session1Id) ? session2Id : session1Id;
-      if (!existingFolder.sessionIds.includes(sessionToAdd)) {
+      const isId1InFolder = existingFolder.sessionIds.some(id => normalizeId(id) === id1);
+      const sessionToAdd = isId1InFolder ? id2 : id1;
+      
+      if (!existingFolder.sessionIds.some(id => normalizeId(id) === sessionToAdd)) {
         const updatedFolders = folders.map(f => 
           f.id === existingFolder.id 
             ? { ...f, sessionIds: [...f.sessionIds, sessionToAdd] }
@@ -82,7 +108,7 @@ export const useSessionManager = () => {
       const newFolder: Folder = {
         id: `folder_${Date.now()}`,
         name: `${session1.title} & ${session2.title}`,
-        sessionIds: [session1Id, session2Id],
+        sessionIds: [id1, id2],
         created_at: new Date().toISOString(),
       };
       saveFolders([...folders, newFolder]);
@@ -91,19 +117,21 @@ export const useSessionManager = () => {
 
   // Add a session to an existing folder
   const addToFolder = (sessionId: string, folderId: string) => {
+    const normalizedSessionId = normalizeId(sessionId);
     const folder = folders.find(f => f.id === folderId);
-    if (!folder || folder.sessionIds.includes(sessionId)) return;
+    
+    if (!folder || folder.sessionIds.some(id => normalizeId(id) === normalizedSessionId)) return;
 
     // Remove from any other folder first
     let updatedFolders = folders.map(f => ({
       ...f,
-      sessionIds: f.sessionIds.filter(id => id !== sessionId)
+      sessionIds: f.sessionIds.filter(id => normalizeId(id) !== normalizedSessionId)
     }));
 
     // Add to target folder
     updatedFolders = updatedFolders.map(f =>
       f.id === folderId
-        ? { ...f, sessionIds: [...f.sessionIds, sessionId] }
+        ? { ...f, sessionIds: [...f.sessionIds, normalizedSessionId] }
         : f
     );
 
@@ -115,9 +143,11 @@ export const useSessionManager = () => {
 
   // Remove a session from its folder
   const removeFromFolder = (sessionId: string) => {
+    const normalizedSessionId = normalizeId(sessionId);
+    
     let updatedFolders = folders.map(f => ({
       ...f,
-      sessionIds: f.sessionIds.filter(id => id !== sessionId)
+      sessionIds: f.sessionIds.filter(id => normalizeId(id) !== normalizedSessionId)
     }));
 
     // Remove folders with less than 2 sessions
@@ -138,6 +168,19 @@ export const useSessionManager = () => {
       f.id === folderId ? { ...f, name: newName } : f
     );
     saveFolders(updatedFolders);
+  };
+
+  // Rename a session
+  const handleRenameSession = async (sessionId: string, newName: string) => {
+    try {
+      await dashragAPI.renameSession(sessionId, newName);
+      setSessions(prev => prev.map(s => 
+        s.id === sessionId ? { ...s, title: newName } : s
+      ));
+    } catch (err: any) {
+      console.error("Failed to rename session:", err);
+      alert(err.message || "Failed to rename chat");
+    }
   };
 
   const handleCreateNewChat = () => {
@@ -257,5 +300,6 @@ export const useSessionManager = () => {
     removeFromFolder,
     deleteFolder,
     renameFolder,
+    handleRenameSession,
   };
 };

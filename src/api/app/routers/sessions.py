@@ -168,6 +168,50 @@ def get_session(sid: int = Query(..., description="Session ID"), db: DBSession =
     stats = {"graph_exists": graph_dir.exists()}
     return {"id": s.id, "title": s.title, "settings": s.settings, "stats": stats}
 
+@router.patch(
+    "",
+    response_model=dict,
+    summary="Update session",
+    description="""
+    Update session properties like title.
+    
+    **Query parameters:**
+    - `sid`: Session ID to update
+    
+    **Request body:**
+    - `title`: New title for the session
+    
+    **Returns:** Updated session object
+    """,
+    responses={
+        200: {
+            "description": "Session updated successfully",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "id": 1,
+                        "title": "Updated Title",
+                        "settings": {}
+                    }
+                }
+            }
+        },
+        404: {"description": "Session not found"}
+    }
+)
+def update_session(payload: dict, sid: int = Query(..., description="Session ID"), db: DBSession = Depends(get_db)):
+    """Update a session's properties"""
+    s = db.get(SessionModel, sid)
+    if not s:
+        raise HTTPException(404, "Session not found")
+    
+    if "title" in payload:
+        s.title = payload["title"]
+    
+    db.commit()
+    db.refresh(s)
+    return {"id": s.id, "title": s.title, "settings": s.settings}
+
 @router.delete(
     "", 
     response_model=dict,

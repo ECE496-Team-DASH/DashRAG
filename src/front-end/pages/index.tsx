@@ -41,6 +41,7 @@ export default function Home() {
     removeFromFolder,
     deleteFolder,
     renameFolder,
+    handleRenameSession,
   } = useSessionManager();
 
   const [activeSession, setActiveSession] = useState<Session | null>(null);
@@ -54,8 +55,8 @@ export default function Home() {
   );
 
   // Get sessions that are not in any folder
-  const unfolderSessionIds = folders.flatMap(f => f.sessionIds);
-  const standaloneSessions = sessions.filter(s => !unfolderSessionIds.includes(s.id));
+  const unfolderSessionIds = folders.flatMap(f => f.sessionIds).map(id => String(id));
+  const standaloneSessions = sessions.filter(s => !unfolderSessionIds.includes(String(s.id)));
 
   const handleDragStart = (event: DragStartEvent) => {
     const { active } = event;
@@ -111,7 +112,7 @@ export default function Home() {
         <Navbar isHome={true}/>
 
         <main className="flex-1 p-6">
-          <div className="max-w-6xl mx-auto">
+          <div className="max-w-[90%] mx-auto">
             {/* Header */}
             <div className="mb-8">
               <h1 className="text-3xl font-bold text-gray-900 mb-2">
@@ -191,6 +192,7 @@ export default function Home() {
                           onDeleteFolder={deleteFolder}
                           onRenameFolder={renameFolder}
                           onRemoveFromFolder={removeFromFolder}
+                          onRenameSession={handleRenameSession}
                         />
                       ))}
                       {/* Render standalone sessions */}
@@ -201,6 +203,7 @@ export default function Home() {
                           index={index}
                           onSelect={handleSelectSession}
                           onDelete={handleDeleteSession}
+                          onRename={handleRenameSession}
                         />
                       ))}
                     </div>
