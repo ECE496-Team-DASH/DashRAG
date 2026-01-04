@@ -27,6 +27,14 @@ export interface Session {
   };
   created_at: string;
   updated_at: string;
+  folderId?: string; // ID of folder this session belongs to
+}
+
+export interface Folder {
+  id: string;
+  name: string;
+  sessionIds: string[];
+  created_at: string;
 }
 
 export interface Document {

@@ -1,28 +1,21 @@
 import { Footer } from "@/components/Layout/Footer";
 import { Navbar } from "@/components/Layout/Navbar";
-import { DraggableChatCard } from "@/components/Home/DraggableChatCard";
+import { ChatCard } from "@/components/Home/ChatCard";
+import { FolderCard } from "@/components/Home/FolderCard";
 import { SessionNameModal } from "@/components/Home/SessionNameModal";
 import { DeleteConfirmationModal } from "@/components/Home/DeleteConfirmationModal";
 import { EmptyState } from "@/components/Home/EmptyState";
 import { useSessionManager } from "@/utils/useSessionManager";
-import { useState } from "react";
 import Head from "next/head";
-import {
-  DndContext,
-  DragOverlay,
-  closestCenter,
-  KeyboardSensor,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  DragStartEvent,
-  DragEndEvent,
-} from "@dnd-kit/core";
+import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
+import { useState } from "react";
+import { Session } from "@/types";
 
 export default function Home() {
   const {
     // State
     sessions,
+    folders,
     loading,
     error,
     creatingSession,
@@ -41,86 +34,66 @@ export default function Home() {
     handleSessionNameChange,
     confirmDelete,
     cancelDelete,
+
+    // Folder actions
+    createFolder,
+    addToFolder,
+    removeFromFolder,
+    deleteFolder,
+    renameFolder,
   } = useSessionManager();
 
-  const [activeId, setActiveId] = useState<string | null>(null);
+  const [activeSession, setActiveSession] = useState<Session | null>(null);
 
-  // Configure sensors for better drag experience
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
         distance: 8,
       },
-    }),
-    useSensor(KeyboardSensor)
+    })
   );
 
-  function handleDragStart(event: DragStartEvent) {
-    setActiveId(event.active.id as string);
-  }
+  // Get sessions that are not in any folder
+  const unfolderSessionIds = folders.flatMap(f => f.sessionIds);
+  const standaloneSessions = sessions.filter(s => !unfolderSessionIds.includes(s.id));
 
-  function handleDragEnd(event: DragEndEvent) {
-    // For now, just clear the activeId - you can add your own logic here
-    setActiveId(null);
-  }
-
-  const getDragOverlayContent = () => {
-    if (!activeId) return null;
-
-    // Find the session being dragged
-    const session = sessions.find(s => s.id.toString() === activeId);
-
-    if (session) {
-      const documentCount = session.stats?.document_count ?? 0;
-      const messageCount = session.stats?.message_count ?? 0;
-      
-      const formatDate = (dateString: string) => {
-        const date = new Date(dateString);
-        return date.toLocaleDateString('en-US', {
-          month: 'short',
-          day: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit'
-        });
-      };
-
-      return (
-        <div className="bg-white rounded-lg shadow-xl border-2 border-blue-300 p-4 w-64 opacity-90">
-          <div className="mb-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                <h3 className="font-semibold text-gray-800 truncate flex-1">
-                  {session.title}
-                </h3>
-              </div>
-              <div className="text-gray-400 text-sm">✕</div>
-            </div>
-          </div>
-          
-          <div className="space-y-2 mb-4">
-            <div className="flex justify-between text-sm text-gray-600">
-              <span>Documents:</span>
-              <span className="font-medium">{documentCount}</span>
-            </div>
-            <div className="flex justify-between text-sm text-gray-600">
-              <span>Messages:</span>
-              <span className="font-medium">{messageCount}</span>
-            </div>
-            <div className="text-xs text-gray-500">
-              Updated: {formatDate(session.created_at)}
-            </div>
-          </div>
-          
-          <div className="w-full bg-blue-600 text-white py-2 px-4 rounded-md text-sm font-medium text-center">
-            Open Chat
-          </div>
-        </div>
-      );
+  const handleDragStart = (event: DragStartEvent) => {
+    const { active } = event;
+    if (active.data.current?.type === 'session') {
+      setActiveSession(active.data.current.session);
     }
-
-    return null;
   };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    setActiveSession(null);
+
+    if (!over) return;
+
+    const activeData = active.data.current;
+    const overData = over.data.current;
+
+    if (!activeData || !overData) return;
+
+    // Dragging a session
+    if (activeData.type === 'session') {
+      const draggedSessionId = activeData.session.id;
+
+      // Dropped on another session -> create folder
+      if (overData.type === 'session') {
+        const targetSessionId = overData.session.id;
+        if (draggedSessionId !== targetSessionId) {
+          createFolder(draggedSessionId, targetSessionId);
+        }
+      }
+      // Dropped on a folder -> add to folder
+      else if (overData.type === 'folder') {
+        addToFolder(draggedSessionId, overData.folder.id);
+      }
+    }
+  };
+
+  const totalItems = folders.length + standaloneSessions.length;
 
   return (
     <>
@@ -128,7 +101,7 @@ export default function Home() {
         <title>DashRAG - Chat Management</title>
         <meta
           name="description"
-          content="Manage your DashRAG chat sessions with drag-and-drop interface"
+          content="Manage your DashRAG chat sessions"
         />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <link rel="icon" href="/favicon.ico" />
@@ -145,7 +118,7 @@ export default function Home() {
                 Your Chat Sessions
               </h1>
               <p className="text-gray-600 mb-4">
-                Drag and drop your chat cards to organize them. Click to open or create new conversations.
+                Click to open or create new conversations. Drag and drop sessions onto each other to create folders.
               </p>
 
               <div className="flex gap-4">
@@ -189,43 +162,63 @@ export default function Home() {
               />
 
               {sessions.length > 0 && (
-                <>
-                  {/* Header with tip and count */}
+                <DndContext
+                  sensors={sensors}
+                  onDragStart={handleDragStart}
+                  onDragEnd={handleDragEnd}
+                >
+                  {/* Header with count */}
                   <div className="sticky top-0 bg-white z-10 p-6 pb-4 border-b border-gray-100">
                     <div className="flex items-center justify-between text-sm text-gray-500">
-                      <span>💡 Drag the cards around to organize them</span>
+                      <span>📚 Your chat sessions</span>
                       <span className="bg-gray-100 px-2 py-1 rounded-full text-xs font-medium">
-                        {sessions.length} session{sessions.length !== 1 ? 's' : ''}
+                        {sessions.length} session{sessions.length !== 1 ? 's' : ''} • {folders.length} folder{folders.length !== 1 ? 's' : ''}
                       </span>
                     </div>
                   </div>
 
-                  {/* Chat cards in grid */}
+                  {/* Folders and Chat cards in grid */}
                   <div className="p-6 pt-4">
-                    <DndContext
-                      sensors={sensors}
-                      collisionDetection={closestCenter}
-                      onDragStart={handleDragStart}
-                      onDragEnd={handleDragEnd}
-                    >
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {sessions.map((session, index) => (
-                          <DraggableChatCard
-                            key={session.id}
-                            session={session}
-                            index={index}
-                            onSelect={handleSelectSession}
-                            onDelete={handleDeleteSession}
-                          />
-                        ))}
-                      </div>
-
-                      <DragOverlay>
-                        {getDragOverlayContent()}
-                      </DragOverlay>
-                    </DndContext>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      {/* Render folders first */}
+                      {folders.map((folder) => (
+                        <FolderCard
+                          key={folder.id}
+                          folder={folder}
+                          sessions={sessions}
+                          onSelectSession={handleSelectSession}
+                          onDeleteSession={handleDeleteSession}
+                          onDeleteFolder={deleteFolder}
+                          onRenameFolder={renameFolder}
+                          onRemoveFromFolder={removeFromFolder}
+                        />
+                      ))}
+                      {/* Render standalone sessions */}
+                      {standaloneSessions.map((session, index) => (
+                        <ChatCard
+                          key={session.id}
+                          session={session}
+                          index={index}
+                          onSelect={handleSelectSession}
+                          onDelete={handleDeleteSession}
+                        />
+                      ))}
+                    </div>
                   </div>
-                </>
+
+                  <DragOverlay>
+                    {activeSession ? (
+                      <div className="bg-white rounded-lg shadow-2xl border-2 border-blue-500 p-4 opacity-90 w-72">
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                          <h3 className="font-semibold text-gray-800 truncate">
+                            {activeSession.title}
+                          </h3>
+                        </div>
+                      </div>
+                    ) : null}
+                  </DragOverlay>
+                </DndContext>
               )}
             </div>
           </div>

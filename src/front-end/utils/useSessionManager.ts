@@ -1,11 +1,14 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
-import { Session } from '@/types';
+import { Session, Folder } from '@/types';
 import { dashragAPI } from '@/utils/dashrag-api';
+
+const FOLDERS_STORAGE_KEY = 'dashrag_folders';
 
 export const useSessionManager = () => {
   const router = useRouter();
   const [sessions, setSessions] = useState<Session[]>([]);
+  const [folders, setFolders] = useState<Folder[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [creatingSession, setCreatingSession] = useState(false);
@@ -14,7 +17,26 @@ export const useSessionManager = () => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [sessionToDelete, setSessionToDelete] = useState<Session | null>(null);
 
+  // Load folders from localStorage
+  const loadFolders = () => {
+    try {
+      const stored = localStorage.getItem(FOLDERS_STORAGE_KEY);
+      if (stored) {
+        setFolders(JSON.parse(stored));
+      }
+    } catch (err) {
+      console.error("Failed to load folders:", err);
+    }
+  };
+
+  // Save folders to localStorage
+  const saveFolders = (newFolders: Folder[]) => {
+    localStorage.setItem(FOLDERS_STORAGE_KEY, JSON.stringify(newFolders));
+    setFolders(newFolders);
+  };
+
   useEffect(() => {
+    loadFolders();
     loadSessions();
   }, []);
 
@@ -30,6 +52,92 @@ export const useSessionManager = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  // Create a new folder when two sessions are combined
+  const createFolder = (session1Id: string, session2Id: string) => {
+    const session1 = sessions.find(s => s.id === session1Id);
+    const session2 = sessions.find(s => s.id === session2Id);
+    
+    if (!session1 || !session2) return;
+
+    // Check if either session is already in a folder
+    const existingFolder = folders.find(f => 
+      f.sessionIds.includes(session1Id) || f.sessionIds.includes(session2Id)
+    );
+
+    if (existingFolder) {
+      // Add the other session to the existing folder
+      const sessionToAdd = existingFolder.sessionIds.includes(session1Id) ? session2Id : session1Id;
+      if (!existingFolder.sessionIds.includes(sessionToAdd)) {
+        const updatedFolders = folders.map(f => 
+          f.id === existingFolder.id 
+            ? { ...f, sessionIds: [...f.sessionIds, sessionToAdd] }
+            : f
+        );
+        saveFolders(updatedFolders);
+      }
+    } else {
+      // Create a new folder
+      const newFolder: Folder = {
+        id: `folder_${Date.now()}`,
+        name: `${session1.title} & ${session2.title}`,
+        sessionIds: [session1Id, session2Id],
+        created_at: new Date().toISOString(),
+      };
+      saveFolders([...folders, newFolder]);
+    }
+  };
+
+  // Add a session to an existing folder
+  const addToFolder = (sessionId: string, folderId: string) => {
+    const folder = folders.find(f => f.id === folderId);
+    if (!folder || folder.sessionIds.includes(sessionId)) return;
+
+    // Remove from any other folder first
+    let updatedFolders = folders.map(f => ({
+      ...f,
+      sessionIds: f.sessionIds.filter(id => id !== sessionId)
+    }));
+
+    // Add to target folder
+    updatedFolders = updatedFolders.map(f =>
+      f.id === folderId
+        ? { ...f, sessionIds: [...f.sessionIds, sessionId] }
+        : f
+    );
+
+    // Remove empty folders
+    updatedFolders = updatedFolders.filter(f => f.sessionIds.length > 0);
+
+    saveFolders(updatedFolders);
+  };
+
+  // Remove a session from its folder
+  const removeFromFolder = (sessionId: string) => {
+    let updatedFolders = folders.map(f => ({
+      ...f,
+      sessionIds: f.sessionIds.filter(id => id !== sessionId)
+    }));
+
+    // Remove folders with less than 2 sessions
+    updatedFolders = updatedFolders.filter(f => f.sessionIds.length >= 2);
+
+    saveFolders(updatedFolders);
+  };
+
+  // Delete a folder (sessions remain)
+  const deleteFolder = (folderId: string) => {
+    const updatedFolders = folders.filter(f => f.id !== folderId);
+    saveFolders(updatedFolders);
+  };
+
+  // Rename a folder
+  const renameFolder = (folderId: string, newName: string) => {
+    const updatedFolders = folders.map(f =>
+      f.id === folderId ? { ...f, name: newName } : f
+    );
+    saveFolders(updatedFolders);
   };
 
   const handleCreateNewChat = () => {
@@ -92,6 +200,9 @@ export const useSessionManager = () => {
       
       setSessions(prev => prev.filter(session => session.id !== sessionToDelete.id));
       
+      // Also remove from any folder
+      removeFromFolder(sessionToDelete.id);
+      
       const currentSessionId = localStorage.getItem("dashrag_session_id");
       if (currentSessionId === sessionToDelete.id.toString()) {
         localStorage.removeItem("dashrag_session_id");
@@ -120,6 +231,7 @@ export const useSessionManager = () => {
   return {
     // State
     sessions,
+    folders,
     loading,
     error,
     creatingSession,
@@ -138,5 +250,12 @@ export const useSessionManager = () => {
     handleSessionNameChange,
     confirmDelete,
     cancelDelete,
+    
+    // Folder actions
+    createFolder,
+    addToFolder,
+    removeFromFolder,
+    deleteFolder,
+    renameFolder,
   };
 };
