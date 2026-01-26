@@ -14,6 +14,11 @@ class Settings:
     max_upload_mb: int = int(os.getenv("MAX_UPLOAD_MB", "100"))
     arxiv_max_results: int = int(os.getenv("ARXIV_MAX_RESULTS", "10"))
     
+    # Auth settings
+    jwt_secret_key: str = os.getenv("JWT_SECRET_KEY", "change-me-in-production")
+    jwt_algorithm: str = "HS256"
+    access_token_expire_minutes: int = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "1440"))
+    
     # Optional features - set to None by default
     ngr_use_gemini: bool | None = None
     ngr_use_azure_openai: bool | None = None

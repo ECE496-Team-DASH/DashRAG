@@ -1,10 +1,9 @@
-
 import logging
 import sys
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from .db import Base, engine
-from .routers import sessions, documents, messages, papers, health
+from .db import Base, engine, init_db
+from .routers import sessions, documents, messages, papers, health, auth
 from .config import settings
 
 # Configure logging
@@ -24,7 +23,8 @@ logging.getLogger("uvicorn.access").setLevel(logging.WARNING)  # Reduce noise fr
 logger = logging.getLogger(__name__)
 logger.info(f"Starting DashRAG API with log level: {settings.log_level}")
 
-Base.metadata.create_all(bind=engine)
+# Initialize database with all models
+init_db()
 
 app = FastAPI(
     title="DashRAG Chat API",
@@ -74,6 +74,7 @@ app.add_middleware(
 )
 
 app.include_router(health.router)
+app.include_router(auth.router)
 app.include_router(sessions.router)
 app.include_router(documents.router)
 app.include_router(messages.router)
