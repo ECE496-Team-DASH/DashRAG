@@ -12,7 +12,7 @@ from ..config import settings
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/token")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/token")
 
 def get_db():
     db = SessionLocal()
@@ -29,10 +29,13 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: DBSession = Depend
     )
     try:
         payload = jwt.decode(token, settings.jwt_secret_key, algorithms=[settings.jwt_algorithm])
-        user_id: int = payload.get("sub")
-        if user_id is None:
+        user_id_raw = payload.get("sub")
+        if user_id_raw is None:
             raise credentials_exception
+        user_id = int(user_id_raw)
     except JWTError:
+        raise credentials_exception
+    except (TypeError, ValueError):
         raise credentials_exception
     
     user = db.get(User, user_id)
@@ -63,5 +66,5 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: DBSession = Depe
         raise HTTPException(400, "Invalid credentials")
     
     expire = datetime.now(timezone.utc) + timedelta(minutes=settings.access_token_expire_minutes)
-    token = jwt.encode({"sub": user.id, "exp": expire}, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
+    token = jwt.encode({"sub": str(user.id), "exp": expire}, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
     return {"access_token": token, "token_type": "bearer"}
