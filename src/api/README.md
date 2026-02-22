@@ -1,9 +1,10 @@
 
 # DashRAG Chat API (FastAPI + nano-graphrag)
 
-A session-based chatbot that builds a per-session knowledge graph using **nano-graphrag**.
+A multi-user, session-based chatbot that builds a per-session knowledge graph using **nano-graphrag**.
 
-- One knowledge graph per chat **session** (filesystem-backed).
+- **Multi-user support**: each user registers an account and authenticates with JWT.
+- One knowledge graph per chat **session** (filesystem-backed), scoped to the owning user.
 - **Doc ingestion**: upload PDFs or fetch from arXiv, extract text, then `GraphRAG.insert(str|list[str])`.
 - **Query**: `GraphRAG.query(prompt, QueryParam(...))` in `local|global|naive` modes.
 - DB: SQLite by default; switch to Postgres via `DATABASE_URL`.
@@ -14,6 +15,7 @@ A session-based chatbot that builds a per-session knowledge graph using **nano-g
 ## Table of Contents
 - [Quick Start](#quick-start)
 - [API Documentation](#api-documentation)
+  - [Authentication](#authentication)
   - [Sessions](#sessions)
   - [Documents](#documents)
   - [Messages (Query)](#messages-query)
@@ -90,12 +92,89 @@ uv pip install -r requirements.txt --force-reinstall --no-cache-dir
 
 ## API Documentation
 
+### Authentication
+
+All session, document, and message endpoints require a valid JWT bearer token. Obtain one by registering a user account and then logging in.
+
+#### **POST /auth/register**
+Create a new user account.
+
+**Request Body:**
+```json
+{
+  "email": "user@example.com",
+  "password": "yourpassword"
+}
+```
+
+**Response (200):**
+```json
+{
+  "id": 1,
+  "email": "user@example.com"
+}
+```
+
+**Example (curl):**
+```bash
+curl -X POST http://localhost:8000/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"email": "user@example.com", "password": "yourpassword"}'
+```
+
+**Errors:**
+- 400: `email and password required`
+- 400: `Email already registered`
+
+---
+
+#### **POST /auth/token**
+Log in and receive a JWT access token. The frontend stores this token in local storage and sends it with every subsequent request as `Authorization: Bearer <token>`.
+
+**Request:** OAuth2 password form (`application/x-www-form-urlencoded`)
+- `username` — the registered email address
+- `password` — the account password
+
+**Response (200):**
+```json
+{
+  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "token_type": "bearer"
+}
+```
+
+**Example (curl):**
+```bash
+curl -X POST http://localhost:8000/auth/token \
+  -d "username=user@example.com&password=yourpassword"
+```
+
+**Example (JavaScript — store token in local storage):**
+```javascript
+const res = await fetch('http://localhost:8000/auth/token', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+  body: new URLSearchParams({ username: 'user@example.com', password: 'yourpassword' })
+});
+const { access_token } = await res.json();
+localStorage.setItem('dashrag_token', access_token);
+```
+
+**Errors:**
+- 400: `Invalid credentials`
+
+**Token expiry:** 24 hours by default (configurable via `ACCESS_TOKEN_EXPIRE_MINUTES`).
+
+---
+
 ### Sessions
 
 Sessions are isolated chat contexts, each with its own knowledge graph.
 
+All session endpoints require `Authorization: Bearer <token>`.
+
 #### **POST /sessions**
-Create a new session.
+Create a new session. The session is automatically associated with the authenticated user.
 
 **Request Body:**
 ```json
@@ -107,7 +186,7 @@ Create a new session.
 **Response (201):**
 ```json
 {
-  "id": "sess_a1b2c3d4e5f6",
+  "id": 1,
   "title": "Healthcare LLMs Research",
   "settings": {},
   "stats": {
@@ -120,24 +199,25 @@ Create a new session.
 ```bash
 curl -X POST http://localhost:8000/sessions \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
   -d '{"title": "My Research Session"}'
 ```
 
 ---
 
 #### **GET /sessions**
-List all sessions.
+List all sessions belonging to the authenticated user.
 
 **Response (200):**
 ```json
 [
   {
-    "id": "sess_a1b2c3d4e5f6",
+    "id": 1,
     "title": "Healthcare LLMs Research",
     "settings": {}
   },
   {
-    "id": "sess_f6e5d4c3b2a1",
+    "id": 2,
     "title": "Climate Change Papers",
     "settings": {}
   }
@@ -146,18 +226,19 @@ List all sessions.
 
 **Example (curl):**
 ```bash
-curl http://localhost:8000/sessions
+curl http://localhost:8000/sessions \
+  -H "Authorization: Bearer $TOKEN"
 ```
 
 ---
 
 #### **GET /sessions/detail?sid={sid}**
-Get details for a specific session.
+Get details for a specific session. Returns 403 if the session belongs to another user.
 
 **Response (200):**
 ```json
 {
-  "id": "sess_a1b2c3d4e5f6",
+  "id": 1,
   "title": "Healthcare LLMs Research",
   "settings": {},
   "stats": {
@@ -168,13 +249,14 @@ Get details for a specific session.
 
 **Example (curl):**
 ```bash
-curl "http://localhost:8000/sessions/detail?sid=sess_a1b2c3d4e5f6"
+curl "http://localhost:8000/sessions/detail?sid=1" \
+  -H "Authorization: Bearer $TOKEN"
 ```
 
 ---
 
 #### **DELETE /sessions?sid={sid}**
-Delete a session and all its data (documents, messages, graph).
+Delete a session and all its data (documents, messages, graph). Returns 403 if the session belongs to another user.
 
 **Response (200):**
 ```json
@@ -185,27 +267,29 @@ Delete a session and all its data (documents, messages, graph).
 
 **Example (curl):**
 ```bash
-curl -X DELETE "http://localhost:8000/sessions?sid=sess_a1b2c3d4e5f6"
+curl -X DELETE "http://localhost:8000/sessions?sid=1" \
+  -H "Authorization: Bearer $TOKEN"
 ```
 
 ---
 
 #### **GET /sessions/export?sid={sid}**
-Download session data as a ZIP file (includes graph and uploaded PDFs).
+Download session data as a ZIP file (includes graph and uploaded PDFs). Returns 403 if the session belongs to another user.
 
 **Response:** ZIP file download
 
 **Example (curl):**
 ```bash
 curl -o session_export.zip \
-  "http://localhost:8000/sessions/export?sid=sess_a1b2c3d4e5f6"
+  -H "Authorization: Bearer $TOKEN" \
+  "http://localhost:8000/sessions/export?sid=1"
 ```
 
 ---
 
 ### Documents
 
-Documents are PDFs added to a session's knowledge graph.
+Documents are PDFs added to a session's knowledge graph. All document endpoints require `Authorization: Bearer <token>` and ownership of the target session (returns 403 otherwise).
 
 #### **GET /documents?sid={sid}**
 List all documents in a session.
@@ -214,7 +298,7 @@ List all documents in a session.
 ```json
 [
   {
-    "id": "doc_abc123def456",
+    "id": 1,
     "title": "transformer_paper.pdf",
     "source_type": "upload",
     "status": "ready",
@@ -222,7 +306,7 @@ List all documents in a session.
     "pages": 15
   },
   {
-    "id": "doc_xyz789uvw012",
+    "id": 2,
     "title": "Attention Is All You Need",
     "source_type": "arxiv",
     "status": "ready",
@@ -241,7 +325,8 @@ List all documents in a session.
 
 **Example (curl):**
 ```bash
-curl "http://localhost:8000/documents?sid=sess_a1b2c3d4e5f6"
+curl "http://localhost:8000/documents?sid=1" \
+  -H "Authorization: Bearer $TOKEN"
 ```
 
 ---
@@ -254,7 +339,7 @@ Upload a PDF document to the session.
 **Response (200):**
 ```json
 {
-  "id": "doc_abc123def456",
+  "id": 1,
   "status": "ready",
   "title": "my_paper.pdf"
 }
@@ -263,7 +348,8 @@ Upload a PDF document to the session.
 **Example (curl):**
 ```bash
 curl -X POST \
-  "http://localhost:8000/documents/upload?sid=sess_a1b2c3d4e5f6" \
+  "http://localhost:8000/documents/upload?sid=1" \
+  -H "Authorization: Bearer $TOKEN" \
   -F "file=@/path/to/paper.pdf"
 ```
 
@@ -271,11 +357,15 @@ curl -X POST \
 ```python
 import requests
 
-session_id = "sess_a1b2c3d4e5f6"
+token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+session_id = 1
+headers = {"Authorization": f"Bearer {token}"}
+
 with open("paper.pdf", "rb") as f:
     response = requests.post(
         f"http://localhost:8000/documents/upload?sid={session_id}",
-        files={"file": f}
+        files={"file": f},
+        headers=headers
     )
 print(response.json())
 ```
@@ -306,7 +396,8 @@ Search arXiv without adding documents (preview results).
 
 **Example (curl):**
 ```bash
-curl "http://localhost:8000/documents/search-arxiv?sid=sess_a1b2c3d4e5f6&query=transformer+attention&max_results=3"
+curl "http://localhost:8000/documents/search-arxiv?sid=1&query=transformer+attention&max_results=3" \
+  -H "Authorization: Bearer $TOKEN"
 ```
 
 ---
@@ -324,7 +415,7 @@ Download and add an arXiv paper to the session.
 **Response (200):**
 ```json
 {
-  "id": "doc_xyz789uvw012",
+  "id": 2,
   "status": "ready",
   "arxiv_id": "1706.03762"
 }
@@ -333,8 +424,9 @@ Download and add an arXiv paper to the session.
 **Example (curl):**
 ```bash
 curl -X POST \
-  "http://localhost:8000/documents/add-arxiv?sid=sess_a1b2c3d4e5f6" \
+  "http://localhost:8000/documents/add-arxiv?sid=1" \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
   -d '{"arxiv_id": "1706.03762"}'
 ```
 
@@ -342,7 +434,7 @@ curl -X POST \
 
 ### Messages (Query)
 
-Query the knowledge graph and get AI-generated responses.
+Query the knowledge graph and get AI-generated responses. All message endpoints require `Authorization: Bearer <token>` and ownership of the target session (returns 403 otherwise).
 
 #### **GET /messages?sid={sid}**
 Get chat history for a session.
@@ -351,14 +443,14 @@ Get chat history for a session.
 ```json
 [
   {
-    "id": "msg_user_abc123",
+    "id": 1,
     "role": "user",
     "content": {
       "text": "What are the main contributions of the transformer architecture?"
     }
   },
   {
-    "id": "msg_asst_def456",
+    "id": 2,
     "role": "assistant",
     "content": {
       "text": "The transformer architecture introduced several key innovations..."
@@ -369,7 +461,8 @@ Get chat history for a session.
 
 **Example (curl):**
 ```bash
-curl "http://localhost:8000/messages?sid=sess_a1b2c3d4e5f6"
+curl "http://localhost:8000/messages?sid=1" \
+  -H "Authorization: Bearer $TOKEN"
 ```
 
 ---
@@ -404,7 +497,7 @@ Query the knowledge graph (non-streaming).
 ```json
 {
   "message": {
-    "id": "msg_asst_xyz789",
+    "id": 3,
     "role": "assistant",
     "content": {
       "text": "Based on the papers in this knowledge graph, the key findings are..."
@@ -416,8 +509,9 @@ Query the knowledge graph (non-streaming).
 **Example (curl):**
 ```bash
 curl -X POST \
-  http://localhost:8000/sessions/sess_a1b2c3d4e5f6/messages \
+  "http://localhost:8000/messages?sid=1" \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
   -d '{
     "content": "What are the limitations of current LLM architectures?",
     "mode": "global",
@@ -429,8 +523,12 @@ curl -X POST \
 ```python
 import requests
 
+token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+headers = {"Authorization": f"Bearer {token}"}
+
 response = requests.post(
-    "http://localhost:8000/messages?sid=sess_a1b2c3d4e5f6",
+    "http://localhost:8000/messages?sid=1",
+    headers=headers,
     json={
         "content": "Compare the attention mechanisms across papers",
         "mode": "local",
@@ -459,8 +557,12 @@ data: {"type": "done"}
 import requests
 import json
 
+token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+headers = {"Authorization": f"Bearer {token}"}
+
 response = requests.post(
-    "http://localhost:8000/messages/stream?sid=sess_a1b2c3d4e5f6",
+    "http://localhost:8000/messages/stream?sid=1",
+    headers=headers,
     json={"content": "Summarize the main findings", "mode": "global"},
     stream=True
 )
@@ -474,20 +576,36 @@ for line in response.iter_lines():
             print("\n[Stream complete]")
 ```
 
-**Example (JavaScript/fetch):**
-```javascript
-const eventSource = new EventSource(
-  'http://localhost:8000/messages/stream?sid=sess_a1b2c3d4e5f6'
-);
+**Note:** `EventSource` does not support custom headers. For authenticated streaming in the browser use `fetch` with `stream: true` instead of `EventSource`.
 
-eventSource.onmessage = (event) => {
-  const data = JSON.parse(event.data);
-  if (data.type === 'token') {
-    console.log(data.text);
-  } else if (data.type === 'done') {
-    eventSource.close();
+**Example (JavaScript/fetch streaming):**
+```javascript
+const token = localStorage.getItem('dashrag_token');
+
+const response = await fetch('http://localhost:8000/messages/stream?sid=1', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${token}`
+  },
+  body: JSON.stringify({ content: 'Summarize the main findings', mode: 'global' })
+});
+
+const reader = response.body.getReader();
+const decoder = new TextDecoder();
+
+while (true) {
+  const { done, value } = await reader.read();
+  if (done) break;
+  const text = decoder.decode(value);
+  for (const line of text.split('\n')) {
+    if (line.startsWith('data: ')) {
+      const data = JSON.parse(line.slice(6));
+      if (data.type === 'token') process.stdout.write(data.text);
+      else if (data.type === 'done') console.log('\n[Stream complete]');
+    }
   }
-};
+}
 ```
 
 ---
@@ -526,32 +644,46 @@ curl "http://localhost:8000/papers/search?query=large+language+models&max_result
 
 ## Typical Workflows
 
-### Workflow 1: Create Session & Upload PDFs
+### Workflow 1: Register, Create Session & Upload PDFs
 
 ```bash
-# 1. Create a session
+# 0. Register a user (one-time)
+curl -X POST http://localhost:8000/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"email": "user@example.com", "password": "yourpassword"}'
+
+# 1. Log in and capture the token
+TOKEN=$(curl -s -X POST http://localhost:8000/auth/token \
+  -d "username=user@example.com&password=yourpassword" | jq -r '.access_token')
+
+# 2. Create a session
 SESSION_ID=$(curl -s -X POST http://localhost:8000/sessions \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
   -d '{"title": "My Research"}' | jq -r '.id')
 
 echo "Session ID: $SESSION_ID"
 
-# 2. Upload PDFs
+# 3. Upload PDFs
 curl -X POST \
   "http://localhost:8000/documents/upload?sid=$SESSION_ID" \
+  -H "Authorization: Bearer $TOKEN" \
   -F "file=@paper1.pdf"
 
 curl -X POST \
   "http://localhost:8000/documents/upload?sid=$SESSION_ID" \
+  -H "Authorization: Bearer $TOKEN" \
   -F "file=@paper2.pdf"
 
-# 3. Check document status
-curl "http://localhost:8000/documents?sid=$SESSION_ID"
+# 4. Check document status
+curl "http://localhost:8000/documents?sid=$SESSION_ID" \
+  -H "Authorization: Bearer $TOKEN"
 
-# 4. Query the knowledge graph
+# 5. Query the knowledge graph
 curl -X POST \
   "http://localhost:8000/messages?sid=$SESSION_ID" \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
   -d '{
     "content": "What are the main themes across these papers?",
     "mode": "global"
@@ -568,38 +700,53 @@ import time
 
 BASE_URL = "http://localhost:8000"
 
-# 1. Create session
-session = requests.post(f"{BASE_URL}/sessions", json={
-    "title": "Transformer Architecture Research"
-}).json()
+# 1. Register (one-time)
+requests.post(f"{BASE_URL}/auth/register",
+              json={"email": "user@example.com", "password": "yourpassword"})
+
+# 2. Log in and store the token
+token_resp = requests.post(
+    f"{BASE_URL}/auth/token",
+    data={"username": "user@example.com", "password": "yourpassword"}
+).json()
+token = token_resp["access_token"]
+headers = {"Authorization": f"Bearer {token}"}
+
+# 3. Create session
+session = requests.post(f"{BASE_URL}/sessions",
+                        headers=headers,
+                        json={"title": "Transformer Architecture Research"}).json()
 sid = session["id"]
 print(f"Created session: {sid}")
 
-# 2. Search arXiv
+# 4. Search arXiv (no auth required for global paper search)
 papers = requests.get(f"{BASE_URL}/papers/search", params={
     "query": "transformer attention mechanism",
     "max_results": 3
 }).json()
 
-# 3. Add selected papers
+# 5. Add selected papers
 for paper in papers:
     print(f"Adding: {paper['title']}")
     requests.post(
         f"{BASE_URL}/documents/add-arxiv?sid={sid}",
+        headers=headers,
         json={"arxiv_id": paper["arxiv_id"]}
     )
 
-# 4. Wait for processing (poll status)
+# 6. Wait for processing (poll status)
 while True:
-    docs = requests.get(f"{BASE_URL}/documents", params={"sid": sid}).json()
+    docs = requests.get(f"{BASE_URL}/documents", params={"sid": sid},
+                        headers=headers).json()
     if all(d["status"] == "ready" for d in docs):
         print("All documents ready!")
         break
     print("Processing documents...")
     time.sleep(5)
 
-# 5. Query with global mode (cross-document synthesis)
-response = requests.post(f"{BASE_URL}/messages", params={"sid": sid}, json={
+# 7. Query with global mode (cross-document synthesis)
+response = requests.post(f"{BASE_URL}/messages", params={"sid": sid},
+                         headers=headers, json={
     "content": "Compare the attention mechanisms proposed in these papers",
     "mode": "global",
     "top_k": 15
@@ -608,8 +755,9 @@ response = requests.post(f"{BASE_URL}/messages", params={"sid": sid}, json={
 print("\nAnswer:")
 print(response["message"]["content"]["text"])
 
-# 6. Follow-up with local mode (specific details)
-response = requests.post(f"{BASE_URL}/messages", params={"sid": sid}, json={
+# 8. Follow-up with local mode (specific details)
+response = requests.post(f"{BASE_URL}/messages", params={"sid": sid},
+                         headers=headers, json={
     "content": "What are the computational complexity advantages?",
     "mode": "local",
     "top_k": 10
@@ -624,10 +772,15 @@ print(response["message"]["content"]["text"])
 ### Workflow 3: Export Session Data
 
 ```bash
-SESSION_ID="sess_a1b2c3d4e5f6"
+# Log in first
+TOKEN=$(curl -s -X POST http://localhost:8000/auth/token \
+  -d "username=user@example.com&password=yourpassword" | jq -r '.access_token')
+
+SESSION_ID=1
 
 # Export session as ZIP
 curl -o my_research_backup.zip \
+  -H "Authorization: Bearer $TOKEN" \
   "http://localhost:8000/sessions/export?sid=$SESSION_ID"
 
 # The ZIP contains:
@@ -673,6 +826,10 @@ AZURE_OPENAI_API_VERSION=2024-02-15-preview
 # Optional overrides
 # NGR_USE_GEMINI=true
 # NGR_USE_AZURE_OPENAI=true
+
+# Authentication
+JWT_SECRET_KEY=change-me-in-production
+ACCESS_TOKEN_EXPIRE_MINUTES=1440  # 24 hours
 ```
 
 ### Query Modes Explained
@@ -738,25 +895,30 @@ Visit **http://localhost:8000/docs** when the server is running for:
 
 Quick reference of all endpoints:
 
-### Sessions
-- `POST /sessions` - Create session
-- `GET /sessions` - List all sessions
-- `GET /sessions/{sid}` - Get session details
-- `DELETE /sessions/{sid}` - Delete session
-- `GET /sessions/{sid}/export` - Export as ZIP
+### Authentication
+- `POST /auth/register` - Register a new user account
+- `POST /auth/token` - Log in and receive a JWT bearer token
 
-### Documents
-- `GET /sessions/{sid}/documents` - List documents
-- `POST /sessions/{sid}/documents/upload` - Upload PDF
-- `GET /sessions/{sid}/documents/search-arxiv` - Search arXiv
-- `POST /sessions/{sid}/documents/add-arxiv` - Add arXiv paper
+### Sessions *(require Bearer token)*
+- `POST /sessions` - Create session (scoped to authenticated user)
+- `GET /sessions` - List sessions belonging to the current user
+- `GET /sessions/detail?sid={sid}` - Get session details
+- `PATCH /sessions?sid={sid}` - Update session title/settings
+- `DELETE /sessions?sid={sid}` - Delete session
+- `GET /sessions/export?sid={sid}` - Export as ZIP
 
-### Messages
-- `GET /sessions/{sid}/messages` - Get chat history
-- `POST /sessions/{sid}/messages` - Query (non-streaming)
-- `POST /sessions/{sid}/messages/stream` - Query (SSE streaming)
+### Documents *(require Bearer token)*
+- `GET /documents?sid={sid}` - List documents
+- `POST /documents/upload?sid={sid}` - Upload PDF
+- `GET /documents/search-arxiv?sid={sid}` - Search arXiv (preview)
+- `POST /documents/add-arxiv?sid={sid}` - Add arXiv paper
 
-### Papers
+### Messages *(require Bearer token)*
+- `GET /messages?sid={sid}` - Get chat history
+- `POST /messages?sid={sid}` - Query (non-streaming)
+- `POST /messages/stream?sid={sid}` - Query (SSE streaming)
+
+### Papers *(no auth required)*
 - `GET /papers/search` - Global arXiv search
 
 ### Health
@@ -768,19 +930,34 @@ Quick reference of all endpoints:
 
 ### Common Issues
 
+**0. "Could not validate credentials" (401)**
+- Your JWT token is missing, expired, or invalid.
+- Obtain a fresh token via `POST /auth/token` and update your `Authorization: Bearer <token>` header.
+- Token lifetime is `ACCESS_TOKEN_EXPIRE_MINUTES` (default 24 hours).
+
+**0b. "Access denied" (403)**
+- You are authenticated but the requested session belongs to a different user.
+- Verify you are using the token for the account that created the session.
+
 **1. "Session not found" errors**
 ```python
 # Always verify session exists before operations
-response = requests.get(f"{BASE_URL}/sessions/{session_id}")
+headers = {"Authorization": f"Bearer {token}"}
+response = requests.get(f"{BASE_URL}/sessions/detail", params={"sid": session_id},
+                        headers=headers)
 if response.status_code == 404:
     print("Session does not exist. Creating new one...")
-    session = requests.post(f"{BASE_URL}/sessions", json={"title": "New Session"}).json()
+    session = requests.post(f"{BASE_URL}/sessions",
+                            headers=headers,
+                            json={"title": "New Session"}).json()
 ```
 
 **2. "No ready documents" when querying**
 ```python
 # Check document status before querying
-docs = requests.get(f"{BASE_URL}/sessions/{session_id}/documents").json()
+headers = {"Authorization": f"Bearer {token}"}
+docs = requests.get(f"{BASE_URL}/documents", params={"sid": session_id},
+                    headers=headers).json()
 ready_docs = [d for d in docs if d["status"] == "ready"]
 if not ready_docs:
     print("Please add and process documents first")
@@ -869,6 +1046,8 @@ DATA_ROOT=/mnt/shared-storage/data
 ARXIV_MAX_RESULTS=20
 GEMINI_API_KEY=your_key_here
 LOG_LEVEL=info
+JWT_SECRET_KEY=a-long-random-secret-string
+ACCESS_TOKEN_EXPIRE_MINUTES=1440
 ```
 
 ---
@@ -880,6 +1059,7 @@ LOG_LEVEL=info
 │                      FastAPI Server                      │
 ├─────────────────────────────────────────────────────────┤
 │  Routers:                                                │
+│  ├─ Auth       → Register, login (JWT bearer tokens)    │
 │  ├─ Sessions   → Create/manage chat contexts            │
 │  ├─ Documents  → Upload PDFs, fetch from arXiv          │
 │  ├─ Messages   → Query knowledge graph (REST/SSE)       │
@@ -889,7 +1069,8 @@ LOG_LEVEL=info
 │  └─ GraphRAG Service → nano-graphrag wrapper            │
 ├─────────────────────────────────────────────────────────┤
 │  Database (SQLite/PostgreSQL):                          │
-│  ├─ sessions      → Session metadata                    │
+│  ├─ users         → User accounts (email + bcrypt hash) │
+│  ├─ sessions      → Session metadata (user_id FK)       │
 │  ├─ documents     → Document metadata & status          │
 │  └─ messages      → Chat history                        │
 ├─────────────────────────────────────────────────────────┤
@@ -939,6 +1120,6 @@ MIT License - see LICENSE file for details
 
 ---
 
-**Version:** 1.0.0  
-**Last Updated:** October 31, 2025  
+**Version:** 1.1.0  
+**Last Updated:** February 22, 2026  
 **Repository:** [project-prometheus](https://github.com/ECE496-Team-DASH/project-prometheus)
