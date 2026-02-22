@@ -1,0 +1,32 @@
+type: http_request
+model: http_request
+id: rq_ziNaN8mjp4
+createdAt: 2026-02-22T19:28:31.367705300
+updatedAt: 2026-02-22T19:32:15.862076700
+workspaceId: wk_rRjy4MLNiD
+folderId: fl_MV9Xvd3bBW
+authentication: {}
+authenticationType: null
+body:
+  form:
+  - enabled: true
+    name: username
+    value: user@example.com
+  - enabled: true
+    name: password
+    value: yourpassword
+  - enabled: true
+    name: ''
+    value: ''
+bodyType: application/x-www-form-urlencoded
+description: ''
+headers:
+- enabled: true
+  name: Content-Type
+  value: application/x-www-form-urlencoded
+  id: g2QQNGCEWC
+method: POST
+name: auth/token
+sortPriority: 0.001
+url: ${[ BASE_URL ]}/auth/token
+urlParameters: []

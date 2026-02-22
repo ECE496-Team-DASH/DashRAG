@@ -2,11 +2,12 @@ type: http_request
 model: http_request
 id: rq_nYQUtXnBSb
 createdAt: 2025-11-01T03:16:05.403083700
-updatedAt: 2025-11-16T04:25:52.767550700
+updatedAt: 2026-02-22T19:44:54.988476800
 workspaceId: wk_rRjy4MLNiD
 folderId: fl_4gEtSFTJny
-authentication: {}
-authenticationType: null
+authentication:
+  token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIiwiZXhwIjoxNzcxODc1NTczfQ.ywSIj_9lax7Ypg-hLdqI0w36znE4gFU7n3nPUCPLznc
+authenticationType: bearer
 body:
   text: |-
     {
@@ -31,4 +32,4 @@ urlParameters:
 - enabled: true
   name: ''
   value: ''
-  id: aU5Eghzg8A
+  id: chwh77kgPm
