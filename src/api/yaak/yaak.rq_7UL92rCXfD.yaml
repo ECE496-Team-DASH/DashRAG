@@ -2,11 +2,12 @@ type: http_request
 model: http_request
 id: rq_7UL92rCXfD
 createdAt: 2025-11-01T03:07:16.588638700
-updatedAt: 2025-11-16T04:27:04.065446300
+updatedAt: 2026-02-22T19:45:24.264159600
 workspaceId: wk_rRjy4MLNiD
 folderId: fl_tUFZJQ4bqo
-authentication: {}
-authenticationType: null
+authentication:
+  token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIiwiZXhwIjoxNzcxODc1OTAyfQ.kk1QwkqJ4oJ5e0z3jBGPTBa5kjAf57WAeV_CUSyRJnA
+authenticationType: bearer
 body:
   text: ''
 bodyType: null
@@ -19,9 +20,9 @@ url: ${[ BASE_URL ]}/sessions
 urlParameters:
 - enabled: true
   name: sid
-  value: '1'
+  value: '2'
   id: ETV3t7cwBG
 - enabled: true
   name: ''
   value: ''
-  id: RI7GD8ruCJ
+  id: fQx2DNcVMu

@@ -2,15 +2,20 @@ type: http_request
 model: http_request
 id: rq_2yxr4ociPr
 createdAt: 2025-11-01T03:08:02.308154400
-updatedAt: 2025-11-01T03:36:59.872260600
+updatedAt: 2026-02-22T19:45:07.818638900
 workspaceId: wk_rRjy4MLNiD
 folderId: fl_tUFZJQ4bqo
-authentication: {}
-authenticationType: null
+authentication:
+  token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIiwiZXhwIjoxNzcxODc1OTAyfQ.kk1QwkqJ4oJ5e0z3jBGPTBa5kjAf57WAeV_CUSyRJnA
+authenticationType: bearer
 body: {}
 bodyType: null
 description: ''
-headers: []
+headers:
+- enabled: true
+  name: ''
+  value: ''
+  id: 49nXUFdkgp
 method: GET
 name: /sessions
 sortPriority: 0.0

@@ -1,0 +1,39 @@
+type: http_request
+model: http_request
+id: rq_2qab65TzDZ
+createdAt: 2026-02-22T19:22:32.704898800
+updatedAt: 2026-02-22T19:25:40.389702500
+workspaceId: wk_rRjy4MLNiD
+folderId: fl_MV9Xvd3bBW
+authentication: {}
+authenticationType: null
+body:
+  text: |-
+    {
+      "email": "user@example.com",
+      "password": "yourpassword"
+    }
+bodyType: application/json
+description: ''
+headers:
+- enabled: true
+  name: Content-Type
+  value: application/json
+  id: RwcDXQn84C
+method: POST
+name: auth/register
+sortPriority: -0.0001
+url: ${[ BASE_URL ]}/auth/register
+urlParameters:
+- enabled: false
+  name: email
+  value: ''
+  id: 6VNITsrmCJ
+- enabled: false
+  name: password
+  value: ''
+  id: aJpDETdwQI
+- enabled: true
+  name: ''
+  value: ''
+  id: mEafEbSPKv

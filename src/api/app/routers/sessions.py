@@ -5,8 +5,9 @@ from pathlib import Path
 import shutil, tempfile
 
 from ..db import SessionLocal
-from ..models import Session as SessionModel, Document as DocumentModel, Message as MessageModel
+from ..models import Session as SessionModel, Document as DocumentModel, Message as MessageModel, User
 from ..config import settings
+from .auth import get_current_user
 
 router = APIRouter(
     prefix="/sessions", 
@@ -23,6 +24,15 @@ def get_db():
 
 def _session_root(sid: int) -> Path:
     return settings.data_root / "sessions" / str(sid)
+
+def get_user_session(sid: int, user: User, db: DBSession) -> SessionModel:
+    """Helper to get a session and verify ownership"""
+    s = db.get(SessionModel, sid)
+    if not s:
+        raise HTTPException(404, "Session not found")
+    if s.user_id != user.id:
+        raise HTTPException(403, "Access denied")
+    return s
 
 @router.post(
     "", 
@@ -62,10 +72,10 @@ def _session_root(sid: int) -> Path:
         }
     }
 )
-def create_session(payload: dict, db: DBSession = Depends(get_db)):
+def create_session(payload: dict, user: User = Depends(get_current_user), db: DBSession = Depends(get_db)):
     """Create a new session with optional title"""
     title = payload.get("title") or "New Session"
-    s = SessionModel(title=title, graph_dir=str(_session_root("tmp") / "graph"))
+    s = SessionModel(user_id=user.id, title=title, graph_dir=str(_session_root("tmp") / "graph"))
     db.add(s); db.commit(); db.refresh(s)
     s.graph_dir = str(_session_root(s.id) / "graph")
     db.commit(); db.refresh(s)
@@ -106,9 +116,9 @@ def create_session(payload: dict, db: DBSession = Depends(get_db)):
         }
     }
 )
-def list_sessions(db: DBSession = Depends(get_db)):
-    """Get all sessions ordered by creation date"""
-    rows = db.query(SessionModel).order_by(SessionModel.created_at.desc()).all()
+def list_sessions(user: User = Depends(get_current_user), db: DBSession = Depends(get_db)):
+    """Get all sessions for the current user"""
+    rows = db.query(SessionModel).filter(SessionModel.user_id == user.id).order_by(SessionModel.created_at.desc()).all()
     
     result = []
     for r in rows:
@@ -159,11 +169,9 @@ def list_sessions(db: DBSession = Depends(get_db)):
         404: {"description": "Session not found"}
     }
 )
-def get_session(sid: int = Query(..., description="Session ID"), db: DBSession = Depends(get_db)):
+def get_session(sid: int = Query(..., description="Session ID"), user: User = Depends(get_current_user), db: DBSession = Depends(get_db)):
     """Get details for a specific session"""
-    s = db.get(SessionModel, sid)
-    if not s:
-        raise HTTPException(404, "Session not found")
+    s = get_user_session(sid, user, db)
     graph_dir = Path(s.graph_dir)
     stats = {"graph_exists": graph_dir.exists()}
     return {"id": s.id, "title": s.title, "settings": s.settings, "stats": stats}
@@ -199,11 +207,9 @@ def get_session(sid: int = Query(..., description="Session ID"), db: DBSession =
         404: {"description": "Session not found"}
     }
 )
-def update_session(payload: dict, sid: int = Query(..., description="Session ID"), db: DBSession = Depends(get_db)):
+def update_session(payload: dict, sid: int = Query(..., description="Session ID"), user: User = Depends(get_current_user), db: DBSession = Depends(get_db)):
     """Update a session's properties"""
-    s = db.get(SessionModel, sid)
-    if not s:
-        raise HTTPException(404, "Session not found")
+    s = get_user_session(sid, user, db)
     
     if "title" in payload:
         s.title = payload["title"]
@@ -240,11 +246,9 @@ def update_session(payload: dict, sid: int = Query(..., description="Session ID"
         404: {"description": "Session not found"}
     }
 )
-def delete_session(sid: int = Query(..., description="Session ID"), db: DBSession = Depends(get_db)):
+def delete_session(sid: int = Query(..., description="Session ID"), user: User = Depends(get_current_user), db: DBSession = Depends(get_db)):
     """Delete a session and all its data"""
-    s = db.get(SessionModel, sid)
-    if not s:
-        raise HTTPException(404, "Session not found")
+    s = get_user_session(sid, user, db)
     base = Path(s.graph_dir).parent
     try:
         shutil.rmtree(base, ignore_errors=True)
@@ -281,11 +285,9 @@ def delete_session(sid: int = Query(..., description="Session ID"), db: DBSessio
         404: {"description": "Session not found or directory missing"}
     }
 )
-def export_session(sid: int = Query(..., description="Session ID"), db: DBSession = Depends(get_db)):
+def export_session(sid: int = Query(..., description="Session ID"), user: User = Depends(get_current_user), db: DBSession = Depends(get_db)):
     """Export session data as a ZIP file"""
-    s = db.get(SessionModel, sid)
-    if not s:
-        raise HTTPException(404, "Session not found")
+    s = get_user_session(sid, user, db)
     base = _session_root(sid)
     if not base.exists():
         raise HTTPException(404, "Session directory missing")

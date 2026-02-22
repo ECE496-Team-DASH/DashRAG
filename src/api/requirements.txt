@@ -1,4 +1,3 @@
-
 fastapi==0.115.5
 uvicorn[standard]==0.30.6
 pydantic==2.9.2
@@ -25,3 +24,8 @@ httpx==0.27.2
 
 python-dotenv==1.0.1
 portalocker==2.10.1
+
+# Authentication
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+bcrypt==4.0.1

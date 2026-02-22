@@ -2,15 +2,16 @@ type: http_request
 model: http_request
 id: rq_B7Z2awXZHF
 createdAt: 2025-11-01T16:57:06.375386300
-updatedAt: 2025-11-16T17:31:36.569887400
+updatedAt: 2026-02-22T20:18:43.051994500
 workspaceId: wk_rRjy4MLNiD
 folderId: fl_5sRi6UVWDX
-authentication: {}
-authenticationType: null
+authentication:
+  token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIiwiZXhwIjoxNzcxODc1OTAyfQ.kk1QwkqJ4oJ5e0z3jBGPTBa5kjAf57WAeV_CUSyRJnA
+authenticationType: bearer
 body:
   text: |-
     {
-        "content": "what is linearrag?",
+        "content": "what are octants?",
         "mode": "local",
         "top_k": 10
     }
@@ -28,9 +29,9 @@ url: ${[ BASE_URL ]}/messages
 urlParameters:
 - enabled: true
   name: sid
-  value: '2'
+  value: '1'
   id: 9mjZqiPvGt
 - enabled: true
   name: ''
   value: ''
-  id: waw7a5tHQQ
+  id: yngIbCPQIR

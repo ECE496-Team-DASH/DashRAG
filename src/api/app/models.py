@@ -1,5 +1,4 @@
-
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import String, DateTime, Enum, ForeignKey, JSON, Text, Integer
 from sqlalchemy.orm import relationship, Mapped, mapped_column
 import enum
@@ -31,15 +30,26 @@ class Role(str, enum.Enum):
     tool = "tool"
     system = "system"
 
+class User(Base):
+    __tablename__ = "users"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    email: Mapped[str] = mapped_column(String, unique=True, nullable=False, index=True)
+    hashed_password: Mapped[str] = mapped_column(String, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now(timezone.utc))
+
+    sessions = relationship("Session", back_populates="user", cascade="all, delete-orphan")
+
 class Session(Base):
     __tablename__ = "sessions"
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id", ondelete="CASCADE"), index=True)
     title: Mapped[str] = mapped_column(String, nullable=False)
     graph_dir: Mapped[str] = mapped_column(String, nullable=False)
     settings: Mapped[dict] = mapped_column(JSON, default=dict)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now(timezone.utc))
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now(timezone.utc))
 
+    user = relationship("User", back_populates="sessions")
     documents = relationship("Document", back_populates="session", cascade="all, delete-orphan")
     messages = relationship("Message", back_populates="session", cascade="all, delete-orphan")
 
@@ -60,7 +70,7 @@ class Document(Base):
     insert_log: Mapped[str | None] = mapped_column(Text, nullable=True)
     pages: Mapped[int | None] = mapped_column(Integer, nullable=True)
     tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now(timezone.utc))
 
     session = relationship("Session", back_populates="documents")
 
@@ -71,6 +81,6 @@ class Message(Base):
     role: Mapped[Role] = mapped_column(Enum(Role), nullable=False)
     content: Mapped[dict] = mapped_column(JSON, nullable=False)
     token_usage: Mapped[dict | None] = mapped_column(JSON, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now(timezone.utc))
 
     session = relationship("Session", back_populates="messages")

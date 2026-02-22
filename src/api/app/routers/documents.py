@@ -1,4 +1,3 @@
-
 from fastapi import APIRouter, UploadFile, File, HTTPException, Depends, Query, BackgroundTasks
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session as DBSession
@@ -9,13 +8,14 @@ import asyncio
 import json
 
 from ..db import SessionLocal
-from ..models import Session as SessionModel, Document, DocSource, DocStatus
+from ..models import Session as SessionModel, Document, DocSource, DocStatus, User
 from ..utils.pdf_utils import extract_text
 from ..utils.arxiv_utils import search_arxiv, download_pdf
 from ..services.graphrag_service import DashRAGService
 from ..services.background_tasks import process_uploaded_document, process_arxiv_document
 from ..utils.locks import session_lock
 from ..config import settings
+from .auth import get_current_user
 
 logger = logging.getLogger(__name__)
 
@@ -40,6 +40,15 @@ def _lock_file(sid: int) -> Path:
     return _session_root(sid) / ".lock"
 def _graph_dir(sid: int) -> Path:
     return _session_root(sid) / "graph"
+
+def get_user_session(sid: int, user: User, db: DBSession) -> SessionModel:
+    """Helper to get a session and verify ownership"""
+    s = db.get(SessionModel, sid)
+    if not s:
+        raise HTTPException(404, "Session not found")
+    if s.user_id != user.id:
+        raise HTTPException(403, "Access denied")
+    return s
 
 @router.get(
     "", 
@@ -88,10 +97,9 @@ def _graph_dir(sid: int) -> Path:
         }
     }
 )
-def list_docs(sid: int = Query(..., description="Session ID"), db: DBSession = Depends(get_db)):
+def list_docs(sid: int = Query(..., description="Session ID"), user: User = Depends(get_current_user), db: DBSession = Depends(get_db)):
     """List all documents in a session"""
-    if not db.get(SessionModel, sid):
-        raise HTTPException(404, "Session not found")
+    get_user_session(sid, user, db)
     docs = db.query(Document).filter(Document.session_id==sid).order_by(Document.created_at.desc()).all()
     return [{
         "id": d.id, "title": d.title, "source_type": d.source_type.value,
@@ -146,13 +154,12 @@ async def upload_pdf(
     background_tasks: BackgroundTasks,
     sid: int = Query(..., description="Session ID"),
     file: UploadFile = File(...),
+    user: User = Depends(get_current_user),
     db: DBSession = Depends(get_db)
 ):
     """Upload a PDF and process it in the background"""
     logger.info(f"Uploading PDF '{file.filename}' to session {sid}")
-    sess = db.get(SessionModel, sid)
-    if not sess:
-        raise HTTPException(404, "Session not found")
+    sess = get_user_session(sid, user, db)
     if not file.filename.lower().endswith(".pdf"):
         raise HTTPException(400, "Only PDF files are supported")
 
@@ -228,10 +235,9 @@ async def upload_pdf(
         }
     }
 )
-def preview_arxiv(sid: int = Query(..., description="Session ID"), query: str = Query(..., description="Search query"), max_results: int = Query(5, description="Maximum number of results"), db: DBSession = Depends(get_db)):
+def preview_arxiv(sid: int = Query(..., description="Session ID"), query: str = Query(..., description="Search query"), max_results: int = Query(5, description="Maximum number of results"), user: User = Depends(get_current_user), db: DBSession = Depends(get_db)):
     """Preview arXiv search results without adding documents"""
-    if not db.get(SessionModel, sid):
-        raise HTTPException(404, "Session not found")
+    get_user_session(sid, user, db)
     max_results = min(max_results, settings.arxiv_max_results)
     return search_arxiv(query, max_results=max_results)
 
@@ -289,13 +295,12 @@ async def add_arxiv(
     background_tasks: BackgroundTasks,
     sid: int = Query(..., description="Session ID"),
     payload: dict = None,
+    user: User = Depends(get_current_user),
     db: DBSession = Depends(get_db)
 ):
     """Download and process an arXiv paper in the background"""
     logger.info(f"Adding arXiv paper to session {sid}")
-    sess = db.get(SessionModel, sid)
-    if not sess:
-        raise HTTPException(404, "Session not found")
+    sess = get_user_session(sid, user, db)
     arxiv_id = payload.get("arxiv_id")
     if not arxiv_id:
         raise HTTPException(400, "arxiv_id is required")
@@ -354,13 +359,12 @@ async def add_arxiv(
 async def stream_document_progress(
     sid: int = Query(..., description="Session ID"),
     doc_id: int = Query(..., description="Document ID to monitor"),
+    user: User = Depends(get_current_user),
     db: DBSession = Depends(get_db)
 ):
     """Stream real-time progress updates for a document"""
     
-    sess = db.get(SessionModel, sid)
-    if not sess:
-        raise HTTPException(404, "Session not found")
+    get_user_session(sid, user, db)
     
     doc = db.get(Document, doc_id)
     if not doc or doc.session_id != sid:

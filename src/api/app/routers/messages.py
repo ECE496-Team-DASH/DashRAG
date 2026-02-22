@@ -1,4 +1,3 @@
-
 from fastapi import APIRouter, HTTPException, Depends, Query, BackgroundTasks
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session as DBSession
@@ -7,10 +6,11 @@ from pathlib import Path
 import asyncio, json
 
 from ..db import SessionLocal
-from ..models import Session as SessionModel, Document, Message, Role, DocStatus
+from ..models import Session as SessionModel, Document, Message, Role, DocStatus, User
 from ..services.graphrag_service import DashRAGService
 from ..services.background_tasks import process_message_query
 from ..config import settings
+from .auth import get_current_user
 
 router = APIRouter(
     prefix="/messages", 
@@ -27,6 +27,15 @@ def get_db():
 
 def _graph_dir(sid: int) -> Path:
     return settings.data_root / "sessions" / str(sid) / "graph"
+
+def get_user_session(sid: int, user: User, db: DBSession) -> SessionModel:
+    """Helper to get a session and verify ownership"""
+    s = db.get(SessionModel, sid)
+    if not s:
+        raise HTTPException(404, "Session not found")
+    if s.user_id != user.id:
+        raise HTTPException(403, "Access denied")
+    return s
 
 @router.get(
     "", 
@@ -68,11 +77,9 @@ def _graph_dir(sid: int) -> Path:
         }
     }
 )
-def list_messages(sid: int = Query(..., description="Session ID"), db: DBSession = Depends(get_db)):
+def list_messages(sid: int = Query(..., description="Session ID"), user: User = Depends(get_current_user), db: DBSession = Depends(get_db)):
     """Get all messages in a session"""
-    sess = db.get(SessionModel, sid)
-    if not sess:
-        raise HTTPException(404, "Session not found")
+    get_user_session(sid, user, db)
     rows = db.query(Message).filter(Message.session_id==sid).order_by(Message.created_at.asc()).all()
     return [{"id": m.id, "role": m.role.value, "content": m.content} for m in rows]
 
@@ -151,12 +158,11 @@ async def create_message(
     background_tasks: BackgroundTasks,
     sid: int = Query(..., description="Session ID"),
     payload: dict = None,
+    user: User = Depends(get_current_user),
     db: DBSession = Depends(get_db)
 ):
     """Query the knowledge graph in the background"""
-    sess = db.get(SessionModel, sid)
-    if not sess:
-        raise HTTPException(404, "Session not found")
+    sess = get_user_session(sid, user, db)
 
     has_ready = db.query(Document).filter(Document.session_id==sid, Document.status==DocStatus.ready).count() > 0
     if not has_ready:
@@ -260,11 +266,9 @@ async def create_message(
         404: {"description": "Session not found"}
     }
 )
-async def create_message_stream(sid: int = Query(..., description="Session ID"), payload: dict = None, db: DBSession = Depends(get_db)):
+async def create_message_stream(sid: int = Query(..., description="Session ID"), payload: dict = None, user: User = Depends(get_current_user), db: DBSession = Depends(get_db)):
     """Query with SSE streaming response"""
-    sess = db.get(SessionModel, sid)
-    if not sess:
-        raise HTTPException(404, "Session not found")
+    sess = get_user_session(sid, user, db)
 
     has_ready = db.query(Document).filter(Document.session_id==sid, Document.status==DocStatus.ready).count() > 0
     if not has_ready:
