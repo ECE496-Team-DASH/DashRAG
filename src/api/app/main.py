@@ -20,6 +20,10 @@ logging.getLogger("app").setLevel(logging.INFO)
 logging.getLogger("nano_graphrag").setLevel(logging.INFO)
 logging.getLogger("uvicorn.access").setLevel(logging.WARNING)  # Reduce noise from access logs
 
+# Configure DashRAG custom loggers
+logging.getLogger("dashrag.knowledge_graph").setLevel(logging.INFO)
+logging.getLogger("dashrag.performance").setLevel(logging.INFO)
+
 logger = logging.getLogger(__name__)
 logger.info(f"Starting DashRAG API with log level: {settings.log_level}")
 
