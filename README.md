@@ -15,7 +15,7 @@ Repo for MVP2 of Team DASH's ECE496 Capstone Project.
 ## Link to other repos
 
 ### DashRAG Library
-Link: [https://github.com/ECE496-Team-DASH/LLM-as-a-Judge](https://github.com/ECE496-Team-DASH/nano-graphrag)
+Link: [https://github.com/ECE496-Team-DASH/nano-graphrag](https://github.com/ECE496-Team-DASH/nano-graphrag)
 
 ### LLM-as-a-Judge Comparator
 Link: [https://github.com/ECE496-Team-DASH/LLM-as-a-Judge](https://github.com/ECE496-Team-DASH/LLM-as-a-Judge)
