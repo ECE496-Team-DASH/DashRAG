@@ -8,7 +8,7 @@ Repo for MVP2 of Team DASH's ECE496 Capstone Project.
     - Change directory to `\src\api\`
     - Follow the instructions in the `README.md` file in this directory
 4. For the front-end terminal:
-    - Change directory to `\src\front-end\
+    - Change directory to `\src\front-end\`
     - Do `npm install`
     - Run `npm run dev` to launch the front-end. 
 
