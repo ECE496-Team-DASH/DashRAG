@@ -4,6 +4,7 @@ Complete guide with real-world examples for every endpoint.
 
 ## Table of Contents
 - [Getting Started](#getting-started)
+- [Authentication](#authentication)
 - [Session Management](#session-management)
 - [Document Ingestion](#document-ingestion)
 - [Querying the Knowledge Graph](#querying-the-knowledge-graph)
@@ -45,6 +46,81 @@ curl http://localhost:8000/healthz
 
 ---
 
+## Authentication
+
+Most endpoints require a JWT Bearer token. Obtain one by registering and then logging in.
+
+### 1. Register a New Account
+
+```bash
+curl -X POST http://localhost:8000/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"email": "user@example.com", "password": "your-password"}'
+```
+
+**Python:**
+```python
+import requests
+
+response = requests.post(
+    "http://localhost:8000/auth/register",
+    json={"email": "user@example.com", "password": "your-password"}
+)
+print(response.json())  # {"id": 1, "email": "user@example.com"}
+```
+
+---
+
+### 2. Login (Get Token)
+
+The login endpoint uses OAuth2 `application/x-www-form-urlencoded`. The `username` field accepts the user's email.
+
+```bash
+curl -X POST http://localhost:8000/auth/token \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d 'username=user@example.com&password=your-password'
+```
+
+**Response:**
+```json
+{
+  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "token_type": "bearer"
+}
+```
+
+**Python:**
+```python
+import requests
+
+response = requests.post(
+    "http://localhost:8000/auth/token",
+    data={"username": "user@example.com", "password": "your-password"}
+)
+token_data = response.json()
+TOKEN = token_data["access_token"]
+HEADERS = {"Authorization": f"Bearer {TOKEN}"}
+```
+
+**JavaScript:**
+```javascript
+const form = new URLSearchParams();
+form.append('username', 'user@example.com');
+form.append('password', 'your-password');
+
+const response = await fetch('http://localhost:8000/auth/token', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+  body: form.toString()
+});
+const { access_token } = await response.json();
+const AUTH_HEADER = `Bearer ${access_token}`;
+```
+
+> **Note:** `/healthz` and `/papers/search` are public and do not require a token.
+
+---
+
 ## Session Management
 
 ### 1. Create a Session
@@ -54,19 +130,8 @@ curl http://localhost:8000/healthz
 ```bash
 curl -X POST http://localhost:8000/sessions \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
   -d '{"title": "LLM Architecture Research"}'
-```
-
-**Response:**
-```json
-{
-  "id": "sess_a1b2c3d4e5f6",
-  "title": "LLM Architecture Research",
-  "settings": {},
-  "stats": {
-    "doc_count": 0
-  }
-}
 ```
 
 **Python:**
@@ -75,6 +140,7 @@ import requests
 
 response = requests.post(
     "http://localhost:8000/sessions",
+    headers=HEADERS,
     json={"title": "LLM Architecture Research"}
 )
 session = response.json()
@@ -86,7 +152,7 @@ print(f"Created session: {session_id}")
 ```javascript
 const response = await fetch('http://localhost:8000/sessions', {
   method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
+  headers: { 'Content-Type': 'application/json', Authorization: AUTH_HEADER },
   body: JSON.stringify({ title: 'LLM Architecture Research' })
 });
 const session = await response.json();
@@ -98,7 +164,8 @@ console.log('Session ID:', session.id);
 ### 2. List All Sessions
 
 ```bash
-curl http://localhost:8000/sessions
+curl http://localhost:8000/sessions \
+  -H "Authorization: Bearer $TOKEN"
 ```
 
 **Response:**
@@ -122,7 +189,8 @@ curl http://localhost:8000/sessions
 ### 3. Get Session Details
 
 ```bash
-curl "http://localhost:8000/sessions/detail?sid=sess_a1b2c3d4e5f6"
+curl "http://localhost:8000/sessions/detail?sid=sess_a1b2c3d4e5f6" \
+  -H "Authorization: Bearer $TOKEN"
 ```
 
 **Response:**
@@ -144,6 +212,7 @@ curl "http://localhost:8000/sessions/detail?sid=sess_a1b2c3d4e5f6"
 **Download as ZIP file:**
 ```bash
 curl -o session_backup.zip \
+  -H "Authorization: Bearer $TOKEN" \
   "http://localhost:8000/sessions/export?sid=sess_a1b2c3d4e5f6"
 ```
 
@@ -170,7 +239,8 @@ print("Session exported successfully")
 **Warning:** This is permanent and deletes all data!
 
 ```bash
-curl -X DELETE "http://localhost:8000/sessions?sid=sess_a1b2c3d4e5f6"
+curl -X DELETE "http://localhost:8000/sessions?sid=sess_a1b2c3d4e5f6" \
+  -H "Authorization: Bearer $TOKEN"
 ```
 
 **Response:**
@@ -190,6 +260,7 @@ curl -X DELETE "http://localhost:8000/sessions?sid=sess_a1b2c3d4e5f6"
 ```bash
 curl -X POST \
   "http://localhost:8000/documents/upload?sid=sess_a1b2c3d4e5f6" \
+  -H "Authorization: Bearer $TOKEN" \
   -F "file=@transformer_paper.pdf"
 ```
 
@@ -211,6 +282,7 @@ session_id = "sess_a1b2c3d4e5f6"
 with open("transformer_paper.pdf", "rb") as f:
     response = requests.post(
         f"http://localhost:8000/documents/upload?sid={session_id}",
+        headers=HEADERS,
         files={"file": f}
     )
 
@@ -296,6 +368,7 @@ for paper in papers:
 curl -X POST \
   "http://localhost:8000/documents/add-arxiv?sid=sess_a1b2c3d4e5f6" \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
   -d '{"arxiv_id": "1706.03762"}'
 ```
 
@@ -339,7 +412,8 @@ for paper in papers:
 
 **Get all documents in session:**
 ```bash
-curl "http://localhost:8000/documents?sid=sess_a1b2c3d4e5f6"
+curl "http://localhost:8000/documents?sid=sess_a1b2c3d4e5f6" \
+  -H "Authorization: Bearer $TOKEN"
 ```
 
 **Response:**
@@ -403,6 +477,7 @@ while True:
 curl -X POST \
   "http://localhost:8000/messages?sid=sess_a1b2c3d4e5f6" \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
   -d '{
     "content": "What is the self-attention mechanism?",
     "mode": "local",
@@ -415,6 +490,7 @@ curl -X POST \
 curl -X POST \
   "http://localhost:8000/messages?sid=sess_a1b2c3d4e5f6" \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
   -d '{
     "content": "Summarize the main themes across all papers",
     "mode": "global",
@@ -445,6 +521,7 @@ session_id = "sess_a1b2c3d4e5f6"
 response = requests.post(
     f"http://localhost:8000/messages",
     params={"sid": session_id},
+    headers=HEADERS,
     json={
         "content": "What are the key innovations in transformer architecture?",
         "mode": "global",
@@ -562,7 +639,8 @@ while (true) {
 ### 3. Get Chat History
 
 ```bash
-curl "http://localhost:8000/messages?sid=sess_a1b2c3d4e5f6"
+curl "http://localhost:8000/messages?sid=sess_a1b2c3d4e5f6" \
+  -H "Authorization: Bearer $TOKEN"
 ```
 
 **Response:**
@@ -598,9 +676,14 @@ from pathlib import Path
 
 BASE_URL = "http://localhost:8000"
 
+# 0. Login
+token_data = requests.post(f"{BASE_URL}/auth/token",
+    data={"username": "user@example.com", "password": "your-password"}).json()
+HEADERS = {"Authorization": f"Bearer {token_data['access_token']}"}
+
 # 1. Create session
 print("Creating session...")
-session = requests.post(f"{BASE_URL}/sessions", json={
+session = requests.post(f"{BASE_URL}/sessions", headers=HEADERS, json={
     "title": "Research Papers Analysis"
 }).json()
 sid = session["id"]
@@ -615,6 +698,7 @@ for pdf_path in pdf_files:
     with open(pdf_path, "rb") as f:
         doc = requests.post(
             f"{BASE_URL}/documents/upload?sid={sid}",
+            headers=HEADERS,
             files={"file": f}
         ).json()
     print(f"  ✓ {pdf_path.name} → {doc['status']}")
@@ -622,7 +706,7 @@ for pdf_path in pdf_files:
 # 3. Wait for processing
 print("\nProcessing documents...")
 while True:
-    docs = requests.get(f"{BASE_URL}/documents", params={"sid": sid}).json()
+    docs = requests.get(f"{BASE_URL}/documents", params={"sid": sid}, headers=HEADERS).json()
     statuses = [d["status"] for d in docs]
     
     if all(s == "ready" for s in statuses):
@@ -646,6 +730,7 @@ for query in queries:
     response = requests.post(
         f"{BASE_URL}/messages",
         params={"sid": sid},
+        headers=HEADERS,
         json={"content": query, "mode": "global", "top_k": 15}
     ).json()
     
@@ -654,7 +739,7 @@ for query in queries:
 
 # 5. Export session
 print("\nExporting session...")
-export_response = requests.get(f"{BASE_URL}/sessions/export", params={"sid": sid})
+export_response = requests.get(f"{BASE_URL}/sessions/export", params={"sid": sid}, headers=HEADERS)
 with open(f"session_export_{sid}.zip", "wb") as f:
     f.write(export_response.content)
 print("✓ Session exported!")
@@ -670,8 +755,13 @@ import time
 
 BASE_URL = "http://localhost:8000"
 
+# 0. Login
+token_data = requests.post(f"{BASE_URL}/auth/token",
+    data={"username": "user@example.com", "password": "your-password"}).json()
+HEADERS = {"Authorization": f"Bearer {token_data['access_token']}"}
+
 # 1. Create session
-session = requests.post(f"{BASE_URL}/sessions", json={
+session = requests.post(f"{BASE_URL}/sessions", headers=HEADERS, json={
     "title": "Transformer Architecture Survey"
 }).json()
 sid = session["id"]

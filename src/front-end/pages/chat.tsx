@@ -3,8 +3,10 @@ import { Footer } from "@/components/Layout/Footer";
 import { Navbar } from "@/components/Layout/Navbar";
 import { Message, Document, QueryMode, StatusMessage as StatusMsg, ProcessingPhase, ArXivPaper } from "@/types";
 import { dashragAPI } from "@/utils/dashrag-api";
+import { useAuth } from "@/utils/AuthContext";
 import Head from "next/head";
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/router";
 
 // Helper function to get user-friendly phase descriptions
 const getPhaseDescription = (phase: ProcessingPhase | undefined): string => {
@@ -23,6 +25,8 @@ const getPhaseDescription = (phase: ProcessingPhase | undefined): string => {
 };
 
 export default function ChatPage() {
+  const router = useRouter();
+  const { token, isLoading: authLoading } = useAuth();
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [sessionTitle, setSessionTitle] = useState<string>("");
   const [messages, setMessages] = useState<Message[]>([]);
@@ -45,8 +49,16 @@ export default function ChatPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
+  // Auth guard
+  useEffect(() => {
+    if (!authLoading && !token) {
+      router.replace("/login");
+    }
+  }, [authLoading, token]);
+
   // Initialize or restore session
   useEffect(() => {
+    if (authLoading || !token) return;
     const initSession = async () => {
       try {
         // Try to restore from localStorage
@@ -83,7 +95,7 @@ export default function ChatPage() {
     };
 
     initSession();
-  }, []);
+  }, [authLoading, token]);
 
   // Save query mode to localStorage
   useEffect(() => {
@@ -135,6 +147,54 @@ export default function ChatPage() {
     });
   };
 
+  // Fetch-based SSE reader (avoids EventSource's lack of custom header support)
+  const processDocumentSSE = async (sessId: string, docId: string, label: string) => {
+    const API_BASE = process.env.NEXT_PUBLIC_DASHRAG_API_URL || "http://localhost:8000";
+    const url = `${API_BASE}/documents/progress-stream?sid=${sessId}&doc_id=${docId}`;
+    try {
+      const res = await fetch(url, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok || !res.body) {
+        updateLastStatusMessage("error", "Connection error during processing", 0);
+        return;
+      }
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+        for (const line of lines) {
+          if (!line.startsWith("data: ")) continue;
+          try {
+            const data = JSON.parse(line.slice(6));
+            if (data.event === "complete") {
+              if (data.status === "ready") {
+                updateLastStatusMessage("ready", `✅ ${label} is ready!`, 100);
+              } else if (data.status === "error") {
+                updateLastStatusMessage("error", `❌ Failed to process ${label}`, 0);
+              }
+              await loadDocuments(sessId);
+              return;
+            } else if (data.event === "error") {
+              updateLastStatusMessage("error", data.message || "Processing failed", 0);
+              return;
+            } else {
+              const phaseMsg = getPhaseDescription(data.processing_phase);
+              updateLastStatusMessage("processing", phaseMsg, data.progress_percent || 10);
+            }
+          } catch {}
+        }
+      }
+    } catch {
+      updateLastStatusMessage("error", "Connection error during processing", 0);
+    }
+  };
+
   const handleFileUpload = async (file: File) => {
     if (!sessionId) {
       alert("No active session. Please refresh the page.");
@@ -154,51 +214,11 @@ export default function ChatPage() {
       const doc = await dashragAPI.uploadDocument(sessionId, file);
       
       updateLastStatusMessage("processing", `⏳ Processing ${file.name}...`, 5);
-
-      // Use SSE to stream progress updates
-      const API_BASE = process.env.NEXT_PUBLIC_DASHRAG_API_URL || "http://localhost:8000";
-      const eventSource = new EventSource(
-        `${API_BASE}/documents/progress-stream?sid=${sessionId}&doc_id=${doc.id}`
-      );
-
-      eventSource.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          
-          if (data.event === "complete") {
-            if (data.status === "ready") {
-              updateLastStatusMessage("ready", `✅ ${file.name} is ready!`, 100);
-            } else if (data.status === "error") {
-              updateLastStatusMessage("error", `❌ Failed to process ${file.name}`, 0);
-            }
-            eventSource.close();
-            loadDocuments(sessionId);
-            setUploadingFile(false);
-          } else if (data.event === "error") {
-            updateLastStatusMessage("error", data.message || "Processing failed", 0);
-            eventSource.close();
-            setUploadingFile(false);
-          } else {
-            // Regular progress update
-            const phaseMsg = getPhaseDescription(data.processing_phase);
-            const progress = data.progress_percent || 10;
-            updateLastStatusMessage("processing", phaseMsg, progress);
-          }
-        } catch (e) {
-          console.error("Error parsing SSE data:", e);
-        }
-      };
-
-      eventSource.onerror = (error) => {
-        console.error("SSE error:", error);
-        updateLastStatusMessage("error", "Connection error during processing", 0);
-        eventSource.close();
-        setUploadingFile(false);
-      };
-
+      await processDocumentSSE(sessionId, doc.id, file.name);
     } catch (error: any) {
       console.error("Upload error:", error);
       updateLastStatusMessage("error", error.message || "Upload failed");
+    } finally {
       setUploadingFile(false);
     }
   };
@@ -225,6 +245,7 @@ export default function ChatPage() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
         body: JSON.stringify({
           sessionId,
@@ -327,51 +348,11 @@ export default function ChatPage() {
       const doc = await dashragAPI.addArxivPaper(sessionId, arxivId);
       
       updateLastStatusMessage("processing", `⏳ Downloading arXiv:${arxivId}...`, 5);
-
-      // Use SSE to stream progress updates
-      const API_BASE = process.env.NEXT_PUBLIC_DASHRAG_API_URL || "http://localhost:8000";
-      const eventSource = new EventSource(
-        `${API_BASE}/documents/progress-stream?sid=${sessionId}&doc_id=${doc.id}`
-      );
-
-      eventSource.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          
-          if (data.event === "complete") {
-            if (data.status === "ready") {
-              updateLastStatusMessage("ready", `✅ arXiv:${arxivId} is ready!`, 100);
-            } else if (data.status === "error") {
-              updateLastStatusMessage("error", `❌ Failed to process arXiv:${arxivId}`, 0);
-            }
-            eventSource.close();
-            loadDocuments(sessionId);
-            setUploadingFile(false);
-          } else if (data.event === "error") {
-            updateLastStatusMessage("error", data.message || "Processing failed", 0);
-            eventSource.close();
-            setUploadingFile(false);
-          } else {
-            // Regular progress update
-            const phaseMsg = getPhaseDescription(data.processing_phase);
-            const progress = data.progress_percent || 10;
-            updateLastStatusMessage("processing", `${phaseMsg} (arXiv:${arxivId})`, progress);
-          }
-        } catch (e) {
-          console.error("Error parsing SSE data:", e);
-        }
-      };
-
-      eventSource.onerror = (error) => {
-        console.error("SSE error:", error);
-        updateLastStatusMessage("error", "Connection error during processing", 0);
-        eventSource.close();
-        setUploadingFile(false);
-      };
-
+      await processDocumentSSE(sessionId, doc.id, `arXiv:${arxivId}`);
     } catch (error: any) {
       console.error("arXiv error:", error);
       updateLastStatusMessage("error", error.message || "Failed to add arXiv paper");
+    } finally {
       setUploadingFile(false);
     }
   };
@@ -379,6 +360,14 @@ export default function ChatPage() {
   useEffect(() => {
     scrollToBottom();
   }, [messages, statusMessages]);
+
+  if (authLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gray-50">
+        <div className="animate-spin rounded-full h-8 w-8 border-2 border-blue-500 border-t-transparent" />
+      </div>
+    );
+  }
 
   return (
     <>

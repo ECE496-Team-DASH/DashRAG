@@ -84,3 +84,9 @@ export interface ArXivPaper {
   pdf_url: string;
   pdf_size_mb?: number;
 }
+
+export interface User {
+  id: number;
+  email: string;
+  created_at?: string;
+}

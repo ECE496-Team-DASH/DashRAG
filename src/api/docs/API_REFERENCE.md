@@ -11,12 +11,94 @@ Production: https://your-domain.com
 
 ## Authentication
 
-**Current:** None (open API)
-**Production recommendation:** Add JWT or API key middleware
+The API uses **JWT Bearer token** authentication (HS256). Obtain a token via `POST /auth/token` and include it in the `Authorization` header of every protected request.
+
+**Header format:**
+```
+Authorization: Bearer <access_token>
+```
+
+**Public endpoints (no auth required):**
+- `GET /healthz`
+- `GET /papers/search`
+
+All other endpoints require a valid token. Requests with a missing or invalid token receive `401 Unauthorized`.
+
+---
+
+## Auth Endpoints
+
+### `POST /auth/register`
+
+Register a new user account.
+
+**Request Body (JSON):**
+```json
+{
+  "email": "user@example.com",
+  "password": "your-password"
+}
+```
+
+**Response 200:**
+```json
+{
+  "id": 1,
+  "email": "user@example.com"
+}
+```
+
+**Errors:**
+- 400: `email and password required`
+- 400: `Email already registered`
+
+---
+
+### `POST /auth/token`
+
+Obtain a JWT access token (login).
+
+**Content-Type:** `application/x-www-form-urlencoded`
+
+**Form Fields:**
+- `username` (string, required): The user's email address
+- `password` (string, required): The user's password
+
+**Response 200:**
+```json
+{
+  "access_token": "eyJhbGci...",
+  "token_type": "bearer"
+}
+```
+
+**Errors:**
+- 400: `Invalid credentials`
+
+**Token expiry:** Configurable via `ACCESS_TOKEN_EXPIRE_MINUTES` (default: 1440 minutes / 24 hours)
 
 ---
 
 ## Data Models
+
+### User
+
+Represents an authenticated user account.
+
+```json
+{
+  "id": 1,
+  "email": "user@example.com",
+  "created_at": "2024-10-31T10:00:00Z"
+}
+```
+
+**Fields:**
+- `id` (integer, read-only): Unique user identifier
+- `email` (string): Unique email address used for login
+- `created_at` (string, read-only): Account creation timestamp (ISO 8601)
+
+---
 
 ### Session
 
@@ -171,6 +253,8 @@ Check API health and filesystem status.
 
 ### Sessions
 
+> **All session endpoints require authentication.** Include `Authorization: Bearer <token>` in every request. Sessions are automatically scoped to the authenticated user — each user can only list, access, modify, or delete their own sessions.
+
 #### `POST /sessions`
 
 Create a new session.
@@ -196,10 +280,7 @@ Create a new session.
 
 **Errors:**
 - 500: Database or filesystem error
-
----
-
-#### `GET /sessions`
+- 401: Missing or invalid token
 
 List all sessions.
 
@@ -216,7 +297,7 @@ List all sessions.
 ]
 ```
 
-**Note:** Sessions are ordered by creation date (newest first)
+**Note:** Sessions are ordered by creation date (newest first). Only sessions belonging to the authenticated user are returned.
 
 ---
 
@@ -240,6 +321,8 @@ Get session details.
 ```
 
 **Errors:**
+- 401: Missing or invalid token
+- 403: Session belongs to another user
 - 404: Session not found
 
 ---
@@ -286,6 +369,8 @@ Export session as ZIP file.
 ---
 
 ### Documents
+
+> **All document endpoints require authentication.** Access is restricted to documents within sessions owned by the authenticated user.
 
 #### `GET /documents?sid={sid}`
 
@@ -409,6 +494,8 @@ Download and add an arXiv paper to the session.
 ---
 
 ### Messages
+
+> **All message endpoints require authentication.** Access is restricted to messages within sessions owned by the authenticated user.
 
 #### `GET /messages?sid={sid}`
 

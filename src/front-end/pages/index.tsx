@@ -8,10 +8,21 @@ import { EmptyState } from "@/components/Home/EmptyState";
 import { useSessionManager } from "@/utils/useSessionManager";
 import Head from "next/head";
 import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/router";
 import { Session } from "@/types";
+import { useAuth } from "@/utils/AuthContext";
 
 export default function Home() {
+  const router = useRouter();
+  const { token, isLoading: authLoading } = useAuth();
+
+  useEffect(() => {
+    if (!authLoading && !token) {
+      router.replace("/login");
+    }
+  }, [authLoading, token]);
+
   const {
     // State
     sessions,
@@ -57,6 +68,14 @@ export default function Home() {
   // Get sessions that are not in any folder
   const unfolderSessionIds = folders.flatMap(f => f.sessionIds).map(id => String(id));
   const standaloneSessions = sessions.filter(s => !unfolderSessionIds.includes(String(s.id)));
+
+  if (authLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gray-50">
+        <div className="animate-spin rounded-full h-8 w-8 border-2 border-blue-500 border-t-transparent" />
+      </div>
+    );
+ }
 
   const handleDragStart = (event: DragStartEvent) => {
     const { active } = event;

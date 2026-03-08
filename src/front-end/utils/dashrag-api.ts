@@ -2,14 +2,24 @@ import { Session, Document, DashRAGMessage, QueryMode, ArXivPaper } from "@/type
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_DASHRAG_API_URL || "http://localhost:8000";
 
+let authToken: string | null = null;
+
+function getAuthHeaders(isJson = true): Record<string, string> {
+  const headers: Record<string, string> = {};
+  if (isJson) headers["Content-Type"] = "application/json";
+  if (authToken) headers["Authorization"] = `Bearer ${authToken}`;
+  return headers;
+}
+
 export const dashragAPI = {
+  setAuthToken(token: string | null): void {
+    authToken = token;
+  },
   // Session Management
   async createSession(title: string = "New Chat"): Promise<Session> {
     const response = await fetch(`${API_BASE_URL}/sessions`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: getAuthHeaders(),
       body: JSON.stringify({ title }),
     });
     
@@ -21,7 +31,9 @@ export const dashragAPI = {
   },
 
   async getSession(sessionId: string): Promise<Session> {
-    const response = await fetch(`${API_BASE_URL}/sessions/detail?sid=${sessionId}`);
+    const response = await fetch(`${API_BASE_URL}/sessions/detail?sid=${sessionId}`, {
+      headers: getAuthHeaders(false),
+    });
     
     if (!response.ok) {
       throw new Error(`Failed to get session: ${response.statusText}`);
@@ -31,7 +43,9 @@ export const dashragAPI = {
   },
 
   async listSessions(): Promise<Session[]> {
-    const response = await fetch(`${API_BASE_URL}/sessions`);
+    const response = await fetch(`${API_BASE_URL}/sessions`, {
+      headers: getAuthHeaders(false),
+    });
     
     if (!response.ok) {
       throw new Error(`Failed to list sessions: ${response.statusText}`);
@@ -43,6 +57,7 @@ export const dashragAPI = {
   async deleteSession(sessionId: string | number): Promise<void> {
     const response = await fetch(`${API_BASE_URL}/sessions?sid=${sessionId}`, {
       method: "DELETE",
+      headers: getAuthHeaders(false),
     });
     
     if (!response.ok) {
@@ -53,9 +68,7 @@ export const dashragAPI = {
   async renameSession(sessionId: string | number, title: string): Promise<Session> {
     const response = await fetch(`${API_BASE_URL}/sessions?sid=${sessionId}`, {
       method: "PATCH",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: getAuthHeaders(),
       body: JSON.stringify({ title }),
     });
     
@@ -73,6 +86,7 @@ export const dashragAPI = {
 
     const response = await fetch(`${API_BASE_URL}/documents/upload?sid=${sessionId}`, {
       method: "POST",
+      headers: getAuthHeaders(false),
       body: formData,
     });
     
@@ -87,9 +101,7 @@ export const dashragAPI = {
   async addArxivPaper(sessionId: string, arxivId: string): Promise<Document> {
     const response = await fetch(`${API_BASE_URL}/documents/add-arxiv?sid=${sessionId}`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: getAuthHeaders(),
       body: JSON.stringify({ arxiv_id: arxivId }),
     });
     
@@ -102,7 +114,9 @@ export const dashragAPI = {
   },
 
   async getDocuments(sessionId: string): Promise<Document[]> {
-    const response = await fetch(`${API_BASE_URL}/documents?sid=${sessionId}`);
+    const response = await fetch(`${API_BASE_URL}/documents?sid=${sessionId}`, {
+      headers: getAuthHeaders(false),
+    });
     
     if (!response.ok) {
       throw new Error(`Failed to get documents: ${response.statusText}`);
@@ -119,9 +133,7 @@ export const dashragAPI = {
   ): Promise<DashRAGMessage> {
     const response = await fetch(`${API_BASE_URL}/messages?sid=${sessionId}`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: getAuthHeaders(),
       body: JSON.stringify({ content, mode }),
     });
     
@@ -135,11 +147,9 @@ export const dashragAPI = {
   },
 
   async getMessages(sessionId: string): Promise<DashRAGMessage[]> {
-    const response = await fetch(`${API_BASE_URL}/messages?sid=${sessionId}`);
-    
-    if (!response.ok) {
-      throw new Error(`Failed to get messages: ${response.statusText}`);
-    }
+    const response = await fetch(`${API_BASE_URL}/messages?sid=${sessionId}`, {
+      headers: getAuthHeaders(false),
+    });
     
     return response.json();
   },

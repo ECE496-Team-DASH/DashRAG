@@ -19,11 +19,17 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
       return res.status(400).json({ error: "Missing sessionId or content" });
     }
 
+    const authHeader = req.headers.authorization;
+    if (!authHeader) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
     // Call DashRAG API (returns 202 with message_id, processes async)
     const postResponse = await fetch(`${API_BASE_URL}/messages?sid=${sessionId}`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        Authorization: authHeader,
       },
       body: JSON.stringify({ content, mode: mode || "local" }),
     });
@@ -43,7 +49,9 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
       await new Promise(resolve => setTimeout(resolve, pollInterval));
       
-      const getResponse = await fetch(`${API_BASE_URL}/messages?sid=${sessionId}`);
+      const getResponse = await fetch(`${API_BASE_URL}/messages?sid=${sessionId}`, {
+        headers: { Authorization: authHeader },
+      });
       if (!getResponse.ok) {
         continue; // Retry on error
       }
