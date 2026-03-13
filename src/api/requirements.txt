@@ -25,6 +25,9 @@ httpx==0.27.2
 python-dotenv==1.0.1
 portalocker==2.10.1
 
+# Monitoring & Stats
+psutil==5.9.8
+
 # Authentication
 python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
