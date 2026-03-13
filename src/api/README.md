@@ -1,4 +1,3 @@
-
 # DashRAG Chat API (FastAPI + nano-graphrag)
 
 A multi-user, session-based chatbot that builds a per-session knowledge graph using **nano-graphrag**.
@@ -1003,9 +1002,34 @@ if not ready_docs:
 ## Development
 
 ### Running Tests
+
+Unit tests live in `src/api/tests/` and can be run from the `src/api/` directory.
+
+Make sure you have pyenv activated before running the test suites.
+
 ```bash
-pytest tests/
+# Run the full test suite
+python3 -m pytest tests/ -v
 ```
+
+### Coverage Report
+
+Generate a terminal coverage summary:
+
+```bash
+python3 -m pytest tests/ --cov=app --cov-report=term-missing -v
+```
+
+Generate an HTML coverage report:
+
+```bash
+python3 -m pytest tests/ --cov=app --cov-report=html --cov-report=term-missing -v
+# Then open: htmlcov/index.html
+```
+
+Notes:
+- `htmlcov/` and coverage artifacts are ignored by git (see `.gitignore`).
+- Some GraphRAG-heavy modules may have lower coverage since they require external services.
 
 ### Code Style
 ```bash
