@@ -2,6 +2,7 @@
 # ADD YOUR OWN RULES HERE
 
 dashrag.db
+test_dashrag.db
 data/
 reference-implementations/
 

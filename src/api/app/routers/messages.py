@@ -290,18 +290,23 @@ async def create_message_stream(sid: int = Query(..., description="Session ID"),
     rag = DashRAGService(_graph_dir(sid))
     try:
         answer = await rag.query(prompt, **{k:v for k,v in qp_kwargs.items() if v is not None})
-    except ValueError as e:
-        # User-friendly error messages
-        async def err_stream():
-            payload = {"type": "error", "message": str(e)}
+    except ValueError as exc:
+        # Avoid closing over exception vars inside generator (Python 3.13 NameError)
+        msg = str(exc)
+
+        async def err_stream(message: str):
+            payload = {"type": "error", "message": message}
             yield ("data: " + json.dumps(payload) + "\n\n").encode("utf-8")
-        return StreamingResponse(err_stream(), media_type="text/event-stream")
-    except Exception as e:
-        # Internal errors
-        async def err_stream():
-            payload = {"type": "error", "message": f"Query failed: {str(e)}"}
+
+        return StreamingResponse(err_stream(msg), media_type="text/event-stream")
+    except Exception as exc:
+        msg = f"Query failed: {str(exc)}"
+
+        async def err_stream(message: str):
+            payload = {"type": "error", "message": message}
             yield ("data: " + json.dumps(payload) + "\n\n").encode("utf-8")
-        return StreamingResponse(err_stream(), media_type="text/event-stream")
+
+        return StreamingResponse(err_stream(msg), media_type="text/event-stream")
 
     # Persist assistant message before streaming
     m_asst = Message(session_id=sid, role=Role.assistant, content={"text": answer})
