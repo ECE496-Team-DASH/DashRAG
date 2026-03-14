@@ -67,7 +67,10 @@ Currently open (no auth). Add your own auth middleware for production.
 # Allow all origins in dev; restrict in prod
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "http://localhost:3000",
+        "https://dashrag.vercel.app"
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
