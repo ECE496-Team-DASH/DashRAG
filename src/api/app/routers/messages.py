@@ -289,7 +289,7 @@ async def create_message_stream(sid: int = Query(..., description="Session ID"),
 
     rag = DashRAGService(_graph_dir(sid))
     try:
-        answer = await rag.query(prompt, **{k:v for k,v in qp_kwargs.items() if v is not None})
+        answer_payload = await rag.query(prompt, **{k:v for k,v in qp_kwargs.items() if v is not None})
     except ValueError as e:
         # User-friendly error messages
         async def err_stream():
@@ -304,11 +304,18 @@ async def create_message_stream(sid: int = Query(..., description="Session ID"),
         return StreamingResponse(err_stream(), media_type="text/event-stream")
 
     # Persist assistant message before streaming
-    m_asst = Message(session_id=sid, role=Role.assistant, content={"text": answer})
+    m_asst = Message(
+        session_id=sid,
+        role=Role.assistant,
+        content=answer_payload if isinstance(answer_payload, dict) else {"text": str(answer_payload)},
+    )
     db.add(m_asst); db.commit(); db.refresh(m_asst)
 
+    answer_text = answer_payload.get("text", "") if isinstance(answer_payload, dict) else str(answer_payload)
+    citations = answer_payload.get("citations", []) if isinstance(answer_payload, dict) else []
+
     async def event_stream() -> AsyncGenerator[bytes, None]:
-        yield f"data: {json.dumps({'type': 'token', 'text': answer})}\n\n".encode("utf-8")
-        yield f"data: {json.dumps({'type': 'done'})}\n\n".encode("utf-8")
+        yield f"data: {json.dumps({'type': 'token', 'text': answer_text})}\n\n".encode("utf-8")
+        yield f"data: {json.dumps({'type': 'done', 'citations': citations})}\n\n".encode("utf-8")
 
     return StreamingResponse(event_stream(), media_type="text/event-stream")

@@ -263,11 +263,18 @@ export default function ChatPage() {
       
       // API returns {message: {content: {text: "..."}}}
       if (data.message && data.message.content) {
+        const normalizedContent = typeof data.message.content === "string"
+          ? { text: data.message.content, citations: [] }
+          : {
+              text: data.message.content.text || "",
+              citations: Array.isArray(data.message.content.citations)
+                ? data.message.content.citations
+                : [],
+            };
+
         const assistantMessage: Message = {
           role: "assistant",
-          content: typeof data.message.content === "string" 
-            ? data.message.content 
-            : data.message.content.text,
+          content: normalizedContent,
         };
         setMessages((prev) => [...prev, assistantMessage]);
       } else {

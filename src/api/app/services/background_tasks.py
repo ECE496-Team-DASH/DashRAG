@@ -277,7 +277,7 @@ def process_message_query(
         rag = DashRAGService(graph_dir)
         try:
             # Run async GraphRAG operation in new event loop
-            answer = asyncio.run(rag.query(prompt, **{k:v for k,v in qp_kwargs.items() if v is not None}))
+            answer_payload = asyncio.run(rag.query(prompt, **{k:v for k,v in qp_kwargs.items() if v is not None}))
             logger.info(f"Query completed successfully for message {message_id}")
         except Exception as e:
             error_msg = f"GraphRAG query failed: {str(e)}"
@@ -296,7 +296,7 @@ def process_message_query(
         m_asst = Message(
             session_id=session_id,
             role=Role.assistant,
-            content={"text": answer}
+            content=answer_payload if isinstance(answer_payload, dict) else {"text": str(answer_payload)}
         )
         db.add(m_asst)
         db.commit()

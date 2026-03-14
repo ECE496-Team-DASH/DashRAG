@@ -1,6 +1,32 @@
+export type CitationType = "document" | "community" | "entity" | "relationship" | "text_chunk";
+
+export interface Citation {
+  id: string;
+  type: CitationType;
+  label: string;
+  snippet?: string;
+  score?: number;
+  metadata?: {
+    file_name?: string;
+    occurrence?: number;
+    chunk_count?: number;
+    full_doc_id?: string;
+    chunk_order_index?: string | number;
+    entity_type?: string;
+    weight?: number;
+    community_id?: string;
+    [key: string]: any;
+  };
+}
+
+export interface MessageContent {
+  text: string;
+  citations?: Citation[];
+}
+
 export interface Message {
   role: Role;
-  content: string | { text: string };
+  content: string | MessageContent;
 }
 
 export type Role = "assistant" | "user" | "system";
@@ -56,9 +82,7 @@ export interface DashRAGMessage {
   id: string;
   session_id: string;
   role: Role;
-  content: {
-    text: string;
-  };
+  content: MessageContent;
   token_usage?: {
     prompt: number;
     completion: number;
