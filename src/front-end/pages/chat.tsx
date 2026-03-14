@@ -8,6 +8,17 @@ import Head from "next/head";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/router";
 
+const makeStatusId = () =>
+  `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+
+const estimateIndexMsFromFileSize = (fileSizeBytes?: number) => {
+  const mb = (fileSizeBytes || 0) / (1024 * 1024);
+  const estimate = 14000 + mb * 24000;
+  return Math.max(8000, Math.min(estimate, 25 * 60 * 1000));
+};
+
+const nowMs = () => Date.now();
+
 // Helper function to get user-friendly phase descriptions
 const getPhaseDescription = (phase: ProcessingPhase | undefined): string => {
   if (!phase) return "Processing...";
@@ -116,39 +127,52 @@ export default function ChatPage() {
   const addStatusMessage = (
     status: "uploading" | "processing" | "ready" | "error",
     message: string,
-    progress?: number
+    progress?: number,
+    extras?: Partial<StatusMsg>
   ) => {
+    const id = makeStatusId();
+    const timestamp = nowMs();
     const statusMsg: StatusMsg = {
+      id,
       type: "status",
       status,
       message,
       progress,
+      startedAtMs: timestamp,
+      timingUpdatedAtMs: timestamp,
+      ...extras,
     };
     setStatusMessages((prev) => [...prev, statusMsg]);
     setTimeout(() => scrollToBottom(), 100);
+    return id;
   };
 
-  const updateLastStatusMessage = (
+  const updateStatusMessage = (
+    statusId: string,
     status: "uploading" | "processing" | "ready" | "error",
     message: string,
-    progress?: number
+    progress?: number,
+    extras?: Partial<StatusMsg>
   ) => {
     setStatusMessages((prev) => {
-      const updated = [...prev];
-      if (updated.length > 0) {
-        updated[updated.length - 1] = {
+      const timestamp = nowMs();
+      return prev.map((item) => {
+        if (item.id !== statusId) return item;
+        return {
+          ...item,
           type: "status",
           status,
           message,
           progress,
+          timingUpdatedAtMs: timestamp,
+          ...extras,
         };
-      }
-      return updated;
+      });
     });
   };
 
   // Fetch-based SSE reader (avoids EventSource's lack of custom header support)
-  const processDocumentSSE = async (sessId: string, docId: string, label: string) => {
+  const processDocumentSSE = async (sessId: string, docId: string, label: string, statusId: string) => {
     const API_BASE = process.env.NEXT_PUBLIC_DASHRAG_API_URL || "http://localhost:8000";
     const url = `${API_BASE}/documents/progress-stream?sid=${sessId}&doc_id=${docId}`;
     try {
@@ -156,7 +180,7 @@ export default function ChatPage() {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
       if (!res.ok || !res.body) {
-        updateLastStatusMessage("error", "Connection error during processing", 0);
+        updateStatusMessage(statusId, "error", "Connection error during processing", 0);
         return;
       }
       const reader = res.body.getReader();
@@ -174,24 +198,47 @@ export default function ChatPage() {
             const data = JSON.parse(line.slice(6));
             if (data.event === "complete") {
               if (data.status === "ready") {
-                updateLastStatusMessage("ready", `✅ ${label} is ready!`, 100);
+                const doneMs = data.completed_in_ms ?? data.elapsed_ms;
+                updateStatusMessage(
+                  statusId,
+                  "ready",
+                  `✅ Indexed ${label}`,
+                  100,
+                  {
+                    progress: 100,
+                    elapsedMs: doneMs,
+                    estimatedRemainingMs: 0,
+                    estimatedTotalMs: data.estimated_total_ms ?? doneMs,
+                    completedInMs: doneMs,
+                  }
+                );
               } else if (data.status === "error") {
-                updateLastStatusMessage("error", `❌ Failed to process ${label}`, 0);
+                updateStatusMessage(statusId, "error", `❌ Failed to process ${label}`, 0, {
+                  estimatedRemainingMs: 0,
+                });
               }
               await loadDocuments(sessId);
               return;
             } else if (data.event === "error") {
-              updateLastStatusMessage("error", data.message || "Processing failed", 0);
+              updateStatusMessage(statusId, "error", data.message || "Processing failed", 0, {
+                estimatedRemainingMs: 0,
+              });
               return;
             } else {
               const phaseMsg = getPhaseDescription(data.processing_phase);
-              updateLastStatusMessage("processing", phaseMsg, data.progress_percent || 10);
+              updateStatusMessage(statusId, "processing", phaseMsg, data.progress_percent || 10, {
+                elapsedMs: data.elapsed_ms,
+                estimatedTotalMs: data.estimated_total_ms,
+                estimatedRemainingMs: data.estimated_remaining_ms,
+              });
             }
           } catch {}
         }
       }
     } catch {
-      updateLastStatusMessage("error", "Connection error during processing", 0);
+      updateStatusMessage(statusId, "error", "Connection error during processing", 0, {
+        estimatedRemainingMs: 0,
+      });
     }
   };
 
@@ -207,17 +254,28 @@ export default function ChatPage() {
     }
 
     setUploadingFile(true);
-    addStatusMessage("uploading", `📤 Uploading ${file.name}...`, 0);
+    const estimatedTotalMs = estimateIndexMsFromFileSize(file.size);
+    const statusId = addStatusMessage("uploading", `📤 Uploading ${file.name}...`, 0, {
+      estimatedTotalMs,
+      estimatedRemainingMs: estimatedTotalMs,
+      elapsedMs: 0,
+    });
 
     try {
       // Upload the file
       const doc = await dashragAPI.uploadDocument(sessionId, file);
       
-      updateLastStatusMessage("processing", `⏳ Processing ${file.name}...`, 5);
-      await processDocumentSSE(sessionId, doc.id, file.name);
+      updateStatusMessage(statusId, "processing", `⏳ Processing ${file.name}...`, 5, {
+        estimatedTotalMs,
+        estimatedRemainingMs: estimatedTotalMs,
+        elapsedMs: 0,
+      });
+      await processDocumentSSE(sessionId, doc.id, file.name, statusId);
     } catch (error: any) {
       console.error("Upload error:", error);
-      updateLastStatusMessage("error", error.message || "Upload failed");
+      updateStatusMessage(statusId, "error", error.message || "Upload failed", 0, {
+        estimatedRemainingMs: 0,
+      });
     } finally {
       setUploadingFile(false);
     }
@@ -238,48 +296,90 @@ export default function ChatPage() {
     setLoading(true);
 
     const messageText = typeof message.content === "string" ? message.content : message.content.text;
+    const localStartedAt = Date.now();
 
     try {
-      // Call the API through Next.js API route
-      const response = await fetch("/api/chat", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({
-          sessionId,
-          content: messageText,
-          mode: queryMode,
-        }),
+      const createResult = await dashragAPI.createMessageRequest(
+        sessionId,
+        messageText,
+        queryMode
+      );
+
+      const chatStatusId = addStatusMessage(
+        "processing",
+        "🤖 Thinking...",
+        10,
+        {
+          estimatedTotalMs: createResult.estimated_total_ms,
+          estimatedRemainingMs: createResult.estimated_total_ms,
+          elapsedMs: 0,
+        }
+      );
+
+      const maxAttempts = 120;
+      let assistantMessage: any = null;
+      let latestCompletedMs: number | undefined;
+
+      for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+
+        try {
+          const progress = await dashragAPI.getMessageProgress(sessionId, createResult.message_id);
+          latestCompletedMs = progress.completed_in_ms ?? latestCompletedMs;
+          updateStatusMessage(chatStatusId, progress.status === "error" ? "error" : "processing", `🤖 ${progress.stage_label || "Thinking..."}`, progress.progress_percent || 10, {
+            elapsedMs: progress.elapsed_ms,
+            estimatedTotalMs: progress.estimated_total_ms,
+            estimatedRemainingMs: progress.estimated_remaining_ms,
+            completedInMs: progress.completed_in_ms ?? undefined,
+          });
+
+          if (progress.status === "error") {
+            throw new Error(progress.error || "Query failed while processing");
+          }
+        } catch (progressErr) {
+          // Keep polling for the final assistant message even if progress endpoint is temporarily unavailable.
+        }
+
+        const allMessages = await dashragAPI.getMessages(sessionId);
+        const userMsgIndex = allMessages.findIndex((m) => Number(m.id) === createResult.message_id);
+        if (userMsgIndex >= 0 && userMsgIndex < allMessages.length - 1) {
+          const maybeAssistant = allMessages[userMsgIndex + 1];
+          if (maybeAssistant && maybeAssistant.role === "assistant") {
+            assistantMessage = maybeAssistant;
+            break;
+          }
+        }
+      }
+
+      if (!assistantMessage) {
+        throw new Error("Query timed out after 120 seconds");
+      }
+
+      const rawContent = assistantMessage.content;
+      const normalizedContent = typeof rawContent === "string"
+        ? { text: rawContent, citations: [] }
+        : {
+            text: rawContent?.text || "",
+            citations: Array.isArray(rawContent?.citations) ? rawContent.citations : [],
+            timing: rawContent?.timing,
+          };
+
+      const doneMs =
+        normalizedContent.timing?.duration_ms ??
+        latestCompletedMs ??
+        Date.now() - localStartedAt;
+
+      updateStatusMessage(chatStatusId, "ready", "✅ Answer ready", 100, {
+        elapsedMs: doneMs,
+        estimatedRemainingMs: 0,
+        completedInMs: doneMs,
       });
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "Failed to send message");
-      }
-
-      const data = await response.json();
-      
-      // API returns {message: {content: {text: "..."}}}
-      if (data.message && data.message.content) {
-        const normalizedContent = typeof data.message.content === "string"
-          ? { text: data.message.content, citations: [] }
-          : {
-              text: data.message.content.text || "",
-              citations: Array.isArray(data.message.content.citations)
-                ? data.message.content.citations
-                : [],
-            };
-
-        const assistantMessage: Message = {
-          role: "assistant",
-          content: normalizedContent,
-        };
-        setMessages((prev) => [...prev, assistantMessage]);
-      } else {
-        throw new Error("Invalid response format from API");
-      }
+      const assistantMessageForUi: Message = {
+        role: "assistant",
+        content: normalizedContent,
+      };
+      setMessages((prev) => [...prev, assistantMessageForUi]);
     } catch (error: any) {
       console.error("Send message error:", error);
       const errorMessage: Message = {
@@ -287,6 +387,10 @@ export default function ChatPage() {
         content: `Error: ${error.message || "Failed to get response"}`,
       };
       setMessages((prev) => [...prev, errorMessage]);
+      addStatusMessage("error", `❌ ${error.message || "Failed to get response"}`, 0, {
+        elapsedMs: Date.now() - localStartedAt,
+        estimatedRemainingMs: 0,
+      });
     } finally {
       setLoading(false);
     }
@@ -349,16 +453,25 @@ export default function ChatPage() {
     }
 
     setUploadingFile(true);
-    addStatusMessage("uploading", `📥 Adding arXiv paper ${arxivId}...`, 0);
+    const statusId = addStatusMessage("uploading", `📥 Adding arXiv paper ${arxivId}...`, 0, {
+      estimatedTotalMs: 30_000,
+      estimatedRemainingMs: 30_000,
+      elapsedMs: 0,
+    });
 
     try {
       const doc = await dashragAPI.addArxivPaper(sessionId, arxivId);
       
-      updateLastStatusMessage("processing", `⏳ Downloading arXiv:${arxivId}...`, 5);
-      await processDocumentSSE(sessionId, doc.id, `arXiv:${arxivId}`);
+      updateStatusMessage(statusId, "processing", `⏳ Downloading arXiv:${arxivId}...`, 5, {
+        estimatedTotalMs: 30_000,
+        estimatedRemainingMs: 30_000,
+      });
+      await processDocumentSSE(sessionId, doc.id, `arXiv:${arxivId}`, statusId);
     } catch (error: any) {
       console.error("arXiv error:", error);
-      updateLastStatusMessage("error", error.message || "Failed to add arXiv paper");
+      updateStatusMessage(statusId, "error", error.message || "Failed to add arXiv paper", 0, {
+        estimatedRemainingMs: 0,
+      });
     } finally {
       setUploadingFile(false);
     }

@@ -23,7 +23,7 @@ export const DeleteConfirmationModal = ({
             Delete Chat Session
           </h3>
           <p className="text-gray-600">
-            Are you sure you want to delete <strong>"{sessionTitle}"</strong>?
+            Are you sure you want to delete <strong>&quot;{sessionTitle}&quot;</strong>?
           </p>
           <p className="text-sm text-gray-500 mt-2">
             This will permanently remove all messages and documents in this chat. This action cannot be undone.

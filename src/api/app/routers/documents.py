@@ -6,6 +6,8 @@ import logging
 import traceback
 import asyncio
 import json
+import os
+import time
 
 from ..db import SessionLocal
 from ..models import Session as SessionModel, Document, DocSource, DocStatus, User
@@ -13,6 +15,7 @@ from ..utils.pdf_utils import extract_text
 from ..utils.arxiv_utils import search_arxiv, download_pdf
 from ..services.graphrag_service import DashRAGService
 from ..services.background_tasks import process_uploaded_document, process_arxiv_document
+from ..services.eta_estimator import estimate_index_total_ms, estimate_remaining_ms
 from ..utils.locks import session_lock
 from ..config import settings
 from .auth import get_current_user
@@ -369,6 +372,16 @@ async def stream_document_progress(
     doc = db.get(Document, doc_id)
     if not doc or doc.session_id != sid:
         raise HTTPException(404, "Document not found in session")
+
+    file_size_bytes = None
+    try:
+        if doc.local_pdf_path and os.path.exists(doc.local_pdf_path):
+            file_size_bytes = os.path.getsize(doc.local_pdf_path)
+    except OSError:
+        file_size_bytes = None
+
+    initial_estimated_total_ms = estimate_index_total_ms(file_size_bytes, pages=doc.pages)
+    stream_started = time.perf_counter()
     
     async def event_generator():
         """Generate SSE events for document progress"""
@@ -387,19 +400,36 @@ async def stream_document_progress(
                     if not local_doc:
                         yield f"data: {json.dumps({'event': 'error', 'message': 'Document not found'})}\n\n"
                         break
+
+                    elapsed_ms = int((time.perf_counter() - stream_started) * 1000)
+                    refined_total_ms, remaining_ms = estimate_remaining_ms(
+                        elapsed_ms=elapsed_ms,
+                        progress_percent=local_doc.progress_percent,
+                        initial_total_ms=initial_estimated_total_ms,
+                    )
+
+                    event_data = {
+                        "document_id": local_doc.id,
+                        "status": local_doc.status.value,
+                        "processing_phase": local_doc.processing_phase,
+                        "progress_percent": local_doc.progress_percent,
+                        "elapsed_ms": elapsed_ms,
+                        "estimated_total_ms": refined_total_ms,
+                        "estimated_remaining_ms": remaining_ms,
+                        "completed_in_ms": elapsed_ms if local_doc.status in [DocStatus.ready, DocStatus.error] else None,
+                        "file_size_bytes": file_size_bytes,
+                    }
+
+                    # Emit every tick while active so elapsed/remaining updates in real time.
+                    should_emit_tick = local_doc.status in [DocStatus.inserting, DocStatus.downloading]
                     
-                    # Check if anything changed
-                    if (local_doc.status != last_status or 
-                        local_doc.processing_phase != last_phase or 
-                        local_doc.progress_percent != last_progress):
-                        
-                        event_data = {
-                            "document_id": local_doc.id,
-                            "status": local_doc.status.value,
-                            "processing_phase": local_doc.processing_phase,
-                            "progress_percent": local_doc.progress_percent
-                        }
-                        
+                    # Keep prior behavior for status/phase/progress changes too.
+                    if (
+                        should_emit_tick
+                        or local_doc.status != last_status
+                        or local_doc.processing_phase != last_phase
+                        or local_doc.progress_percent != last_progress
+                    ):
                         yield f"data: {json.dumps(event_data)}\n\n"
                         
                         last_status = local_doc.status
@@ -408,7 +438,8 @@ async def stream_document_progress(
                     
                     # Stop streaming if document reached terminal state
                     if local_doc.status in [DocStatus.ready, DocStatus.error]:
-                        yield f"data: {json.dumps({'event': 'complete', 'status': local_doc.status.value})}\n\n"
+                        elapsed_ms = int((time.perf_counter() - stream_started) * 1000)
+                        yield f"data: {json.dumps({'event': 'complete', 'status': local_doc.status.value, 'document_id': local_doc.id, 'elapsed_ms': elapsed_ms, 'completed_in_ms': elapsed_ms, 'estimated_total_ms': max(initial_estimated_total_ms, elapsed_ms), 'estimated_remaining_ms': 0})}\n\n"
                         break
                 finally:
                     local_db.close()

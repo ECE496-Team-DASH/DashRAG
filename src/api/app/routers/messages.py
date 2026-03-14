@@ -4,11 +4,14 @@ from sqlalchemy.orm import Session as DBSession
 from typing import AsyncGenerator
 from pathlib import Path
 import asyncio, json
+import os
 
 from ..db import SessionLocal
 from ..models import Session as SessionModel, Document, Message, Role, DocStatus, User
 from ..services.graphrag_service import DashRAGService
 from ..services.background_tasks import process_message_query
+from ..services.eta_estimator import estimate_chat_total_ms
+from ..services.query_progress import get_message_progress
 from ..config import settings
 from .auth import get_current_user
 
@@ -185,6 +188,29 @@ async def create_message(
         "global_min_community_rating", "naive_max_token_for_text_unit"
     ]}
 
+    ready_docs = db.query(Document).filter(
+        Document.session_id == sid,
+        Document.status == DocStatus.ready,
+    ).all()
+    total_pages = sum(d.pages or 0 for d in ready_docs)
+    total_doc_bytes = 0
+    for doc in ready_docs:
+        try:
+            if doc.local_pdf_path and os.path.exists(doc.local_pdf_path):
+                total_doc_bytes += os.path.getsize(doc.local_pdf_path)
+        except OSError:
+            continue
+
+    prompt_length = len(prompt)
+    # Approximate page contribution when page counts are unavailable.
+    page_proxy = total_pages + int(total_doc_bytes / (1024 * 1024) * 3)
+    estimated_total_ms = estimate_chat_total_ms(
+        mode=str(qp_kwargs.get("mode") or "local"),
+        prompt_length=prompt_length,
+        ready_doc_count=len(ready_docs),
+        ready_doc_pages=page_proxy,
+    )
+
     # Schedule background processing
     background_tasks.add_task(
         process_message_query,
@@ -192,10 +218,77 @@ async def create_message(
         session_id=sid,
         prompt=prompt,
         graph_dir=_graph_dir(sid),
-        qp_kwargs=qp_kwargs
+        qp_kwargs=qp_kwargs,
+        estimated_total_ms=estimated_total_ms,
     )
 
-    return {"message_id": m_user.id, "status": "processing"}
+    return {
+        "message_id": m_user.id,
+        "status": "processing",
+        "estimated_total_ms": estimated_total_ms,
+    }
+
+
+@router.get(
+    "/progress",
+    response_model=dict,
+    summary="Get live progress for a processing message",
+)
+def get_message_progress_status(
+    sid: int = Query(..., description="Session ID"),
+    message_id: int = Query(..., description="User message ID returned by POST /messages"),
+    user: User = Depends(get_current_user),
+    db: DBSession = Depends(get_db),
+):
+    get_user_session(sid, user, db)
+
+    msg = db.get(Message, message_id)
+    if not msg or msg.session_id != sid or msg.role != Role.user:
+        raise HTTPException(404, "Message not found")
+
+    progress = get_message_progress(message_id)
+    if progress:
+        return progress
+
+    rows = db.query(Message).filter(Message.session_id == sid).order_by(Message.created_at.asc()).all()
+    user_msg_index = next((idx for idx, row in enumerate(rows) if row.id == message_id), None)
+    if user_msg_index is not None and user_msg_index < len(rows) - 1:
+        maybe_asst = rows[user_msg_index + 1]
+        if maybe_asst.role == Role.assistant:
+            timing = maybe_asst.content.get("timing") if isinstance(maybe_asst.content, dict) else None
+            return {
+                "message_id": message_id,
+                "session_id": sid,
+                "status": "complete",
+                "stage": "complete",
+                "stage_label": "Completed",
+                "progress_percent": 100,
+                "elapsed_ms": (timing or {}).get("duration_ms") or 0,
+                "estimated_total_ms": (timing or {}).get("estimated_total_ms") or (timing or {}).get("duration_ms") or 0,
+                "estimated_remaining_ms": 0,
+                "completed_in_ms": (timing or {}).get("duration_ms") or 0,
+                "mode": (timing or {}).get("mode") or "local",
+                "started_at": (timing or {}).get("started_at"),
+                "updated_at": (timing or {}).get("completed_at"),
+                "error": maybe_asst.content.get("error") if isinstance(maybe_asst.content, dict) else False,
+            }
+
+    return {
+        "message_id": message_id,
+        "session_id": sid,
+        "status": "processing",
+        "stage": "queued",
+        "stage_label": "Queued",
+        "progress_percent": 0,
+        "elapsed_ms": 0,
+        "estimated_total_ms": 0,
+        "estimated_remaining_ms": 0,
+        "completed_in_ms": None,
+        "mode": "local",
+        "started_at": None,
+        "updated_at": None,
+        "error": None,
+    }
 
 @router.post(
     "/stream",

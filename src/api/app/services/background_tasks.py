@@ -10,6 +10,8 @@ from sqlalchemy.orm import Session as DBSession
 import logging
 import traceback
 import asyncio
+import time
+from datetime import datetime, timezone
 
 from ..models import Document, DocStatus, Message, Role, ProcessingPhase
 from ..utils.pdf_utils import extract_text
@@ -17,6 +19,13 @@ from ..utils.arxiv_utils import download_pdf
 from ..utils.locks import session_lock
 from ..services.graphrag_service import DashRAGService
 from ..services.progress_tracker import attach_progress_handler, detach_progress_handler
+from ..services.eta_estimator import estimate_remaining_ms
+from ..services.query_progress import (
+    start_message_progress,
+    update_message_progress,
+    complete_message_progress,
+    fail_message_progress,
+)
 from ..db import SessionLocal
 
 logger = logging.getLogger(__name__)
@@ -249,7 +258,8 @@ def process_message_query(
     session_id: int,
     prompt: str,
     graph_dir: Path,
-    qp_kwargs: dict
+    qp_kwargs: dict,
+    estimated_total_ms: int = 12000,
 ):
     """
     Background task to process a user message query.
@@ -272,34 +282,89 @@ def process_message_query(
             return
         
         logger.info(f"Background processing query message {message_id} from session {session_id}")
+        op_started = time.perf_counter()
+        op_started_dt = datetime.now(timezone.utc)
+        mode = str((qp_kwargs or {}).get("mode") or "local")
+        start_message_progress(
+            message_id=message_id,
+            session_id=session_id,
+            estimated_total_ms=estimated_total_ms,
+            mode=mode,
+        )
+
+        def _sync_progress(stage: str, stage_label: str, progress_percent: int):
+            elapsed_ms = int((time.perf_counter() - op_started) * 1000)
+            refined_total_ms, remaining_ms = estimate_remaining_ms(
+                elapsed_ms=elapsed_ms,
+                progress_percent=progress_percent,
+                initial_total_ms=estimated_total_ms,
+            )
+            update_message_progress(
+                message_id,
+                stage=stage,
+                stage_label=stage_label,
+                progress_percent=progress_percent,
+                elapsed_ms=elapsed_ms,
+                estimated_total_ms=refined_total_ms,
+                estimated_remaining_ms=remaining_ms,
+            )
+
+        _sync_progress("preparing_query", "Preparing query", 10)
         
         # Execute query against knowledge graph
         rag = DashRAGService(graph_dir)
         try:
             # Run async GraphRAG operation in new event loop
-            answer_payload = asyncio.run(rag.query(prompt, **{k:v for k,v in qp_kwargs.items() if v is not None}))
+            _sync_progress("querying_graphrag", "Querying knowledge graph", 45)
+            cleaned_qp_kwargs = {k: v for k, v in (qp_kwargs or {}).items() if v is not None}
+            answer_payload = asyncio.run(rag.query(prompt, **cleaned_qp_kwargs))
+            _sync_progress("building_response", "Building response", 85)
             logger.info(f"Query completed successfully for message {message_id}")
         except Exception as e:
             error_msg = f"GraphRAG query failed: {str(e)}"
             logger.error(error_msg, exc_info=True)
+            elapsed_ms = int((time.perf_counter() - op_started) * 1000)
+            fail_message_progress(message_id, elapsed_ms=elapsed_ms, error=str(e))
             # Create error response message
             m_asst = Message(
                 session_id=session_id,
                 role=Role.assistant,
-                content={"text": f"Error: {str(e)}", "error": True}
+                content={
+                    "text": f"Error: {str(e)}",
+                    "error": True,
+                    "timing": {
+                        "started_at": op_started_dt.isoformat(),
+                        "completed_at": datetime.now(timezone.utc).isoformat(),
+                        "duration_ms": elapsed_ms,
+                    },
+                },
             )
             db.add(m_asst)
             db.commit()
             return
         
         # Create assistant response message
+        elapsed_ms = int((time.perf_counter() - op_started) * 1000)
+        completed_at = datetime.now(timezone.utc).isoformat()
+        started_at = op_started_dt.isoformat()
+
+        response_content = answer_payload if isinstance(answer_payload, dict) else {"text": str(answer_payload)}
+        response_content["timing"] = {
+            "started_at": started_at,
+            "completed_at": completed_at,
+            "duration_ms": elapsed_ms,
+            "mode": mode,
+            "estimated_total_ms": max(int(estimated_total_ms), 1),
+        }
+
         m_asst = Message(
             session_id=session_id,
             role=Role.assistant,
-            content=answer_payload if isinstance(answer_payload, dict) else {"text": str(answer_payload)}
+            content=response_content,
         )
         db.add(m_asst)
         db.commit()
+        complete_message_progress(message_id, completed_in_ms=elapsed_ms)
         logger.info(f"Created assistant response message for query {message_id}")
     
     except Exception as e:

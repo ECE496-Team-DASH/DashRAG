@@ -1,4 +1,4 @@
-import { Session, Document, DashRAGMessage, QueryMode, ArXivPaper } from "@/types";
+import { Session, Document, DashRAGMessage, QueryMode, ArXivPaper, QueryProgress } from "@/types";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_DASHRAG_API_URL || "http://localhost:8000";
 
@@ -126,6 +126,25 @@ export const dashragAPI = {
   },
 
   // Message/Query
+  async createMessageRequest(
+    sessionId: string,
+    content: string,
+    mode: QueryMode = "local"
+  ): Promise<{ message_id: number; status: string; estimated_total_ms?: number }> {
+    const response = await fetch(`${API_BASE_URL}/messages?sid=${sessionId}`, {
+      method: "POST",
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ content, mode }),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to send message: ${error}`);
+    }
+
+    return response.json();
+  },
+
   async sendMessage(
     sessionId: string,
     content: string,
@@ -144,6 +163,21 @@ export const dashragAPI = {
     
     const data = await response.json();
     return data.message;
+  },
+
+  async getMessageProgress(sessionId: string, messageId: number): Promise<QueryProgress> {
+    const response = await fetch(
+      `${API_BASE_URL}/messages/progress?sid=${sessionId}&message_id=${messageId}`,
+      {
+        headers: getAuthHeaders(false),
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`Failed to get message progress: ${response.statusText}`);
+    }
+
+    return response.json();
   },
 
   async getMessages(sessionId: string): Promise<DashRAGMessage[]> {

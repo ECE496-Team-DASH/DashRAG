@@ -16,6 +16,15 @@ export const ChatMessage: FC<Props> = ({ message }) => {
     : structuredContent?.text || "";
 
   const citations = useMemo(() => structuredContent?.citations || [], [structuredContent]);
+  const durationMs = structuredContent?.timing?.duration_ms;
+
+  const formatDuration = (ms?: number) => {
+    if (typeof ms !== "number" || ms < 0) return null;
+    const totalSeconds = Math.round(ms / 1000);
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
+  };
 
   const citationSummary = useMemo(() => {
     if (!citations.length) {
@@ -80,6 +89,12 @@ export const ChatMessage: FC<Props> = ({ message }) => {
       >
         {messageText}
       </div>
+
+      {message.role === "assistant" && formatDuration(durationMs) && (
+        <div className="mt-1 text-[11px] text-neutral-500 max-w-[67%]">
+          Answered in {formatDuration(durationMs)}
+        </div>
+      )}
 
       {message.role === "assistant" && citations.length > 0 && (
         <div className="mt-2 w-full max-w-[67%] rounded-xl border border-neutral-300 bg-white px-3 py-2 text-xs text-neutral-700">

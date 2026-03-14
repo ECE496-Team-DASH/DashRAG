@@ -221,6 +221,12 @@ export const Chat: FC<Props> = ({
               status={statusMsg.status}
               message={statusMsg.message}
               progress={statusMsg.progress}
+              elapsedMs={statusMsg.elapsedMs}
+              estimatedTotalMs={statusMsg.estimatedTotalMs}
+              estimatedRemainingMs={statusMsg.estimatedRemainingMs}
+              completedInMs={statusMsg.completedInMs}
+              startedAtMs={statusMsg.startedAtMs}
+              timingUpdatedAtMs={statusMsg.timingUpdatedAtMs}
             />
           </div>
         ))}

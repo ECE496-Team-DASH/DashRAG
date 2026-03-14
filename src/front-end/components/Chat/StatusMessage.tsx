@@ -1,12 +1,62 @@
-import { FC } from "react";
+import { FC, useEffect, useMemo, useState } from "react";
 
 interface Props {
   status: "uploading" | "processing" | "ready" | "error";
   message: string;
   progress?: number;
+  elapsedMs?: number;
+  estimatedTotalMs?: number;
+  estimatedRemainingMs?: number;
+  completedInMs?: number;
+  startedAtMs?: number;
+  timingUpdatedAtMs?: number;
 }
 
-export const StatusMessage: FC<Props> = ({ status, message, progress }) => {
+const formatDuration = (ms?: number) => {
+  if (typeof ms !== "number" || ms < 0) return null;
+  const totalSeconds = Math.round(ms / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  if (minutes > 0) {
+    return `${minutes}m ${seconds}s`;
+  }
+  return `${seconds}s`;
+};
+
+/**
+ * Format remaining duration as stable threshold labels so the display
+ * doesn't feel like a countdown timer. Steps: almost done → ~15s →
+ * ~30s → ~45s → ~1 min → ~1 min 30s → ~2 min → ~3 min → …
+ */
+const formatRemainingDuration = (ms?: number): string | null => {
+  if (typeof ms !== "number" || ms < 0) return null;
+  const s = Math.round(ms / 1000);
+  if (s <= 5) return "almost done...";
+  if (s <= 15) return "~15s";
+  if (s <= 30) return "~30s";
+  if (s <= 45) return "~45s";
+  if (s <= 65) return "~1 min";
+  if (s <= 100) return "~1 min 30s";
+  if (s <= 140) return "~2 min";
+  if (s <= 200) return "~3 min";
+  if (s <= 260) return "~4 min";
+  if (s <= 340) return "~5 min";
+  // For longer durations round up to the nearest minute
+  const mins = Math.ceil(s / 60);
+  return `~${mins} min`;
+};
+
+export const StatusMessage: FC<Props> = ({
+  status,
+  message,
+  progress,
+  elapsedMs,
+  estimatedTotalMs,
+  estimatedRemainingMs,
+  completedInMs,
+  startedAtMs,
+  timingUpdatedAtMs,
+}) => {
   const getIcon = () => {
     switch (status) {
       case "uploading":
@@ -21,6 +71,49 @@ export const StatusMessage: FC<Props> = ({ status, message, progress }) => {
         return "ℹ️";
     }
   };
+
+  const [tickNowMs, setTickNowMs] = useState<number>(Date.now());
+
+  useEffect(() => {
+    if (status !== "processing") {
+      return;
+    }
+    const id = window.setInterval(() => {
+      setTickNowMs(Date.now());
+    }, 1000);
+    return () => window.clearInterval(id);
+  }, [status]);
+
+  const dynamicTiming = useMemo(() => {
+    if (status !== "processing") {
+      return {
+        elapsed: elapsedMs,
+        remaining: estimatedRemainingMs,
+      };
+    }
+
+    const baseElapsed = typeof elapsedMs === "number" ? elapsedMs : 0;
+    const anchor = timingUpdatedAtMs ?? startedAtMs;
+    const delta = anchor ? Math.max(0, tickNowMs - anchor) : 0;
+    const elapsed = baseElapsed + delta;
+
+    let remaining: number | undefined;
+    if (typeof estimatedRemainingMs === "number") {
+      remaining = Math.max(0, estimatedRemainingMs - delta);
+    } else if (typeof estimatedTotalMs === "number") {
+      remaining = Math.max(0, estimatedTotalMs - elapsed);
+    }
+
+    return {
+      elapsed,
+      remaining,
+    };
+  }, [status, elapsedMs, estimatedRemainingMs, estimatedTotalMs, timingUpdatedAtMs, startedAtMs, tickNowMs]);
+
+  const elapsedLabel = formatDuration(dynamicTiming.elapsed);
+  const remainingLabel = formatRemainingDuration(dynamicTiming.remaining);
+  const totalLabel = formatRemainingDuration(estimatedTotalMs);
+  const completedLabel = formatDuration(completedInMs);
 
   const getBackgroundColor = () => {
     switch (status) {
@@ -75,6 +168,16 @@ export const StatusMessage: FC<Props> = ({ status, message, progress }) => {
                 </span>
               </div>
             </div>
+          )}
+          {status === "processing" && (elapsedLabel || remainingLabel || totalLabel) && (
+            <div className="mt-2 text-xs opacity-90">
+              {elapsedLabel ? `Elapsed: ${elapsedLabel}` : "Elapsed: --"}
+              {remainingLabel ? ` | Remaining: ${remainingLabel}` : ""}
+              {!remainingLabel && totalLabel ? ` | Est. total: ${totalLabel}` : ""}
+            </div>
+          )}
+          {status === "ready" && completedLabel && (
+            <div className="mt-2 text-xs opacity-90">Completed in {completedLabel}</div>
           )}
         </div>
       </div>

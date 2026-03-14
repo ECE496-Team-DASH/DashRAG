@@ -22,6 +22,13 @@ export interface Citation {
 export interface MessageContent {
   text: string;
   citations?: Citation[];
+  timing?: {
+    started_at?: string;
+    completed_at?: string;
+    duration_ms?: number;
+    estimated_total_ms?: number;
+    mode?: QueryMode;
+  };
 }
 
 export interface Message {
@@ -91,12 +98,36 @@ export interface DashRAGMessage {
   created_at: string;
 }
 
+export interface QueryProgress {
+  message_id: number;
+  session_id: number;
+  status: "processing" | "complete" | "error";
+  stage: string;
+  stage_label: string;
+  progress_percent: number;
+  elapsed_ms: number;
+  estimated_total_ms: number;
+  estimated_remaining_ms: number;
+  completed_in_ms?: number | null;
+  mode?: QueryMode;
+  started_at?: string | null;
+  updated_at?: string | null;
+  error?: string | null;
+}
+
 export interface StatusMessage {
+  id?: string;
   type: "status";
   status: "uploading" | "processing" | "ready" | "error";
   message: string;
   progress?: number;
   documentId?: string;
+  elapsedMs?: number;
+  estimatedTotalMs?: number;
+  estimatedRemainingMs?: number;
+  completedInMs?: number;
+  startedAtMs?: number;
+  timingUpdatedAtMs?: number;
 }
 
 export interface ArXivPaper {
