@@ -512,7 +512,8 @@ class DashRAGService:
         if "include_text_chunks_in_context" in cleaned_kwargs:
             cleaned_kwargs["include_text_chunks"] = cleaned_kwargs.pop("include_text_chunks_in_context")
 
-        if cleaned_kwargs.get("mode", "global") == "local" and "include_text_chunks" not in cleaned_kwargs:
+        # Now default to True for all modes if not specified
+        if "include_text_chunks" not in cleaned_kwargs:
             cleaned_kwargs["include_text_chunks"] = True
 
         cleaned_kwargs["return_context"] = True
