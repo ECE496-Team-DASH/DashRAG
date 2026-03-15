@@ -9,7 +9,8 @@ SQLAlchemy==2.0.36
 psycopg2-binary==2.9.10
 
 # GraphRAG + related
-nano-graphrag @ git+https://github.com/ECE496-Team-DASH/nano-graphrag.git@main
+# nano-graphrag @ git+https://github.com/ECE496-Team-DASH/nano-graphrag.git@main
+./nano-graphrag
 nano-vectordb>=0.0.4.3
 tiktoken==0.7.0
 networkx==3.3
