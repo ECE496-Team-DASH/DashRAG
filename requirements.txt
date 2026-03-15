@@ -1,0 +1,26 @@
+future>=1.0.0
+openai
+tiktoken
+networkx
+graspologic
+nano-vectordb
+hnswlib
+xxhash
+tenacity
+dspy-ai
+neo4j
+pyvis
+spacy
+nltk
+
+# GenKG dependencies
+google-genai>=0.4.0
+PyMuPDF>=1.24.0
+requests>=2.31.0
+keybert>=0.8.0
+transformers>=4.35.0
+sentence-transformers>=2.2.0
+numpy>=1.24.0
+scikit-learn>=1.3.0
+pydantic>=2.0.0
+python-dotenv>=1.0.0
