@@ -20,7 +20,7 @@ tenacity>=8.5.0
 # PDF + arXiv
 PyMuPDF==1.24.10
 arxiv==2.1.3
-httpx==0.27.2
+httpx>=0.28.1
 
 python-dotenv==1.0.1
 portalocker==2.10.1

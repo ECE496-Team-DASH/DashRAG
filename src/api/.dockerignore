@@ -1,0 +1,15 @@
+.git
+.gitignore
+__pycache__/
+*.py[cod]
+*$py.class
+.env
+.venv
+venv/
+ENV/
+tests/
+Dockerfile
+.dockerignore
+yaak/
+.claude/
+docs/
