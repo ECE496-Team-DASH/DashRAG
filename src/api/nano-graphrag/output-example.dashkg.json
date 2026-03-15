@@ -1,0 +1,444 @@
+{
+  "metadata": {
+    "total_nodes": 25,
+    "total_edges": 42,
+    "sources": [
+      "https://kar.kent.ac.uk/60614/7/p565.pdf"
+    ],
+    "connected_components": 1,
+    "graph_density": 0.14,
+    "average_degree": 3.36
+  },
+  "nodes": [
+    {
+      "id": "Reinforcement Learning (RL)",
+      "label": "Reinforcement Learning (RL)",
+      "source": "https://kar.kent.ac.uk/60614/7/p565.pdf",
+      "color": "#4285F4",
+      "degree": 8
+    },
+    {
+      "id": "Reward Shaping",
+      "label": "Reward Shaping",
+      "source": "https://kar.kent.ac.uk/60614/7/p565.pdf",
+      "color": "#4285F4",
+      "degree": 2
+    },
+    {
+      "id": "Potential-Based Reward Shaping",
+      "label": "Potential-Based Reward Shaping",
+      "source": "https://kar.kent.ac.uk/60614/7/p565.pdf",
+      "color": "#4285F4",
+      "degree": 13
+    },
+    {
+      "id": "Markov Decision Processes (MDPs)",
+      "label": "Markov Decision Processes (MDPs)",
+      "source": "https://kar.kent.ac.uk/60614/7/p565.pdf",
+      "color": "#4285F4",
+      "degree": 2
+    },
+    {
+      "id": "Episodic Reinforcement Learning",
+      "label": "Episodic Reinforcement Learning",
+      "source": "https://kar.kent.ac.uk/60614/7/p565.pdf",
+      "color": "#4285F4",
+      "degree": 2
+    },
+    {
+      "id": "Finite Horizon Reinforcement Learning",
+      "label": "Finite Horizon Reinforcement Learning",
+      "source": "https://kar.kent.ac.uk/60614/7/p565.pdf",
+      "color": "#4285F4",
+      "degree": 4
+    },
+    {
+      "id": "Policy Invariance",
+      "label": "Policy Invariance",
+      "source": "https://kar.kent.ac.uk/60614/7/p565.pdf",
+      "color": "#4285F4",
+      "degree": 4
+    },
+    {
+      "id": "Temporal Credit Assignment Problem",
+      "label": "Temporal Credit Assignment Problem",
+      "source": "https://kar.kent.ac.uk/60614/7/p565.pdf",
+      "color": "#4285F4",
+      "degree": 1
+    },
+    {
+      "id": "Admissibility of Potential Functions",
+      "label": "Admissibility of Potential Functions",
+      "source": "https://kar.kent.ac.uk/60614/7/p565.pdf",
+      "color": "#4285F4",
+      "degree": 3
+    },
+    {
+      "id": "Optimistic Exploration",
+      "label": "Optimistic Exploration",
+      "source": "https://kar.kent.ac.uk/60614/7/p565.pdf",
+      "color": "#4285F4",
+      "degree": 4
+    },
+    {
+      "id": "Nash Equilibrium",
+      "label": "Nash Equilibrium",
+      "source": "https://kar.kent.ac.uk/60614/7/p565.pdf",
+      "color": "#4285F4",
+      "degree": 2
+    },
+    {
+      "id": "Multi-agent Reinforcement Learning",
+      "label": "Multi-agent Reinforcement Learning",
+      "source": "https://kar.kent.ac.uk/60614/7/p565.pdf",
+      "color": "#4285F4",
+      "degree": 4
+    },
+    {
+      "id": "PAC-MDP",
+      "label": "PAC-MDP",
+      "source": "https://kar.kent.ac.uk/60614/7/p565.pdf",
+      "color": "#4285F4",
+      "degree": 5
+    },
+    {
+      "id": "Model-Free Reinforcement Learning",
+      "label": "Model-Free Reinforcement Learning",
+      "source": "https://kar.kent.ac.uk/60614/7/p565.pdf",
+      "color": "#4285F4",
+      "degree": 4
+    },
+    {
+      "id": "Model-Based Reinforcement Learning",
+      "label": "Model-Based Reinforcement Learning",
+      "source": "https://kar.kent.ac.uk/60614/7/p565.pdf",
+      "color": "#4285F4",
+      "degree": 3
+    },
+    {
+      "id": "Mathematical Derivations",
+      "label": "Mathematical Derivations",
+      "source": "https://kar.kent.ac.uk/60614/7/p565.pdf",
+      "color": "#4285F4",
+      "degree": 1
+    },
+    {
+      "id": "Dual Linear Programming Formulations",
+      "label": "Dual Linear Programming Formulations",
+      "source": "https://kar.kent.ac.uk/60614/7/p565.pdf",
+      "color": "#4285F4",
+      "degree": 3
+    },
+    {
+      "id": "Q-learning",
+      "label": "Q-learning",
+      "source": "https://kar.kent.ac.uk/60614/7/p565.pdf",
+      "color": "#4285F4",
+      "degree": 1
+    },
+    {
+      "id": "R-max Algorithm",
+      "label": "R-max Algorithm",
+      "source": "https://kar.kent.ac.uk/60614/7/p565.pdf",
+      "color": "#4285F4",
+      "degree": 2
+    },
+    {
+      "id": "UCT Algorithm",
+      "label": "UCT Algorithm",
+      "source": "https://kar.kent.ac.uk/60614/7/p565.pdf",
+      "color": "#4285F4",
+      "degree": 1
+    },
+    {
+      "id": "Requirement of Φ(terminal_state) = 0 for Policy Invariance in Finite Horizon Tasks",
+      "label": "Requirement of Φ(terminal_state) = 0 for Policy Invariance in Finite Horizon Tasks",
+      "source": "https://kar.kent.ac.uk/60614/7/p565.pdf",
+      "color": "#4285F4",
+      "degree": 3
+    },
+    {
+      "id": "Non-zero Terminal Potentials Alter Nash Equilibria in Multi-agent RL",
+      "label": "Non-zero Terminal Potentials Alter Nash Equilibria in Multi-agent RL",
+      "source": "https://kar.kent.ac.uk/60614/7/p565.pdf",
+      "color": "#4285F4",
+      "degree": 3
+    },
+    {
+      "id": "Correction: Admissibility Not Required for Potential Functions in PAC-MDPs",
+      "label": "Correction: Admissibility Not Required for Potential Functions in PAC-MDPs",
+      "source": "https://kar.kent.ac.uk/60614/7/p565.pdf",
+      "color": "#4285F4",
+      "degree": 3
+    },
+    {
+      "id": "Sufficient Conditions for PAC-MDPs: Φ(s) ≥ 0 for Unknown States, Φ(s) = 0 for Known Terminal States",
+      "label": "Sufficient Conditions for PAC-MDPs: Φ(s) ≥ 0 for Unknown States, Φ(s) = 0 for Known Terminal States",
+      "source": "https://kar.kent.ac.uk/60614/7/p565.pdf",
+      "color": "#4285F4",
+      "degree": 3
+    },
+    {
+      "id": "Φ(goal_state) Must Be Constant (Preferably Zero) for Policy Preservation in Finite Horizon Planning",
+      "label": "Φ(goal_state) Must Be Constant (Preferably Zero) for Policy Preservation in Finite Horizon Planning",
+      "source": "https://kar.kent.ac.uk/60614/7/p565.pdf",
+      "color": "#4285F4",
+      "degree": 3
+    }
+  ],
+  "edges": [
+    {
+      "source": "Reinforcement Learning (RL)",
+      "target": "Markov Decision Processes (MDPs)",
+      "weight": 1.0,
+      "relation": "uses_framework_of"
+    },
+    {
+      "source": "Reinforcement Learning (RL)",
+      "target": "Reward Shaping",
+      "weight": 0.9,
+      "relation": "employs_technique"
+    },
+    {
+      "source": "Reinforcement Learning (RL)",
+      "target": "Episodic Reinforcement Learning",
+      "weight": 0.9,
+      "relation": "is_type_of"
+    },
+    {
+      "source": "Reinforcement Learning (RL)",
+      "target": "Finite Horizon Reinforcement Learning",
+      "weight": 0.9,
+      "relation": "is_type_of"
+    },
+    {
+      "source": "Reinforcement Learning (RL)",
+      "target": "Model-Free Reinforcement Learning",
+      "weight": 0.9,
+      "relation": "is_type_of"
+    },
+    {
+      "source": "Reinforcement Learning (RL)",
+      "target": "Model-Based Reinforcement Learning",
+      "weight": 0.9,
+      "relation": "is_type_of"
+    },
+    {
+      "source": "Reinforcement Learning (RL)",
+      "target": "Multi-agent Reinforcement Learning",
+      "weight": 0.9,
+      "relation": "is_type_of"
+    },
+    {
+      "source": "Reinforcement Learning (RL)",
+      "target": "PAC-MDP",
+      "weight": 0.8,
+      "relation": "is_setting_in"
+    },
+    {
+      "source": "Reward Shaping",
+      "target": "Potential-Based Reward Shaping",
+      "weight": 1.0,
+      "relation": "is_type_of"
+    },
+    {
+      "source": "Potential-Based Reward Shaping",
+      "target": "Temporal Credit Assignment Problem",
+      "weight": 0.8,
+      "relation": "addresses"
+    },
+    {
+      "source": "Potential-Based Reward Shaping",
+      "target": "Policy Invariance",
+      "weight": 0.9,
+      "relation": "aims_to_preserve"
+    },
+    {
+      "source": "Potential-Based Reward Shaping",
+      "target": "Episodic Reinforcement Learning",
+      "weight": 0.8,
+      "relation": "applied_in"
+    },
+    {
+      "source": "Potential-Based Reward Shaping",
+      "target": "Finite Horizon Reinforcement Learning",
+      "weight": 0.8,
+      "relation": "applied_in"
+    },
+    {
+      "source": "Potential-Based Reward Shaping",
+      "target": "Model-Free Reinforcement Learning",
+      "weight": 0.7,
+      "relation": "applied_in"
+    },
+    {
+      "source": "Potential-Based Reward Shaping",
+      "target": "Model-Based Reinforcement Learning",
+      "weight": 0.7,
+      "relation": "applied_in"
+    },
+    {
+      "source": "Potential-Based Reward Shaping",
+      "target": "Multi-agent Reinforcement Learning",
+      "weight": 0.7,
+      "relation": "applied_in"
+    },
+    {
+      "source": "Potential-Based Reward Shaping",
+      "target": "Requirement of Φ(terminal_state) = 0 for Policy Invariance in Finite Horizon Tasks",
+      "weight": 0.9,
+      "relation": "is_finding_about"
+    },
+    {
+      "source": "Potential-Based Reward Shaping",
+      "target": "Non-zero Terminal Potentials Alter Nash Equilibria in Multi-agent RL",
+      "weight": 0.9,
+      "relation": "is_consequence_of"
+    },
+    {
+      "source": "Potential-Based Reward Shaping",
+      "target": "Sufficient Conditions for PAC-MDPs: Φ(s) ≥ 0 for Unknown States, Φ(s) = 0 for Known Terminal States",
+      "weight": 0.9,
+      "relation": "specify_properties_of"
+    },
+    {
+      "source": "Potential-Based Reward Shaping",
+      "target": "Φ(goal_state) Must Be Constant (Preferably Zero) for Policy Preservation in Finite Horizon Planning",
+      "weight": 0.9,
+      "relation": "is_finding_about"
+    },
+    {
+      "source": "Potential-Based Reward Shaping",
+      "target": "Admissibility of Potential Functions",
+      "weight": 0.7,
+      "relation": "utilizes_concept_of"
+    },
+    {
+      "source": "Markov Decision Processes (MDPs)",
+      "target": "Dual Linear Programming Formulations",
+      "weight": 0.9,
+      "relation": "applied_to"
+    },
+    {
+      "source": "Finite Horizon Reinforcement Learning",
+      "target": "Requirement of Φ(terminal_state) = 0 for Policy Invariance in Finite Horizon Tasks",
+      "weight": 0.9,
+      "relation": "applies_to"
+    },
+    {
+      "source": "Finite Horizon Reinforcement Learning",
+      "target": "Φ(goal_state) Must Be Constant (Preferably Zero) for Policy Preservation in Finite Horizon Planning",
+      "weight": 0.9,
+      "relation": "applies_to"
+    },
+    {
+      "source": "Policy Invariance",
+      "target": "Dual Linear Programming Formulations",
+      "weight": 0.8,
+      "relation": "used_to_analyze"
+    },
+    {
+      "source": "Policy Invariance",
+      "target": "Requirement of Φ(terminal_state) = 0 for Policy Invariance in Finite Horizon Tasks",
+      "weight": 1.0,
+      "relation": "is_condition_for"
+    },
+    {
+      "source": "Policy Invariance",
+      "target": "Φ(goal_state) Must Be Constant (Preferably Zero) for Policy Preservation in Finite Horizon Planning",
+      "weight": 1.0,
+      "relation": "is_condition_for"
+    },
+    {
+      "source": "Admissibility of Potential Functions",
+      "target": "PAC-MDP",
+      "weight": 0.8,
+      "relation": "concerned_with"
+    },
+    {
+      "source": "Admissibility of Potential Functions",
+      "target": "Correction: Admissibility Not Required for Potential Functions in PAC-MDPs",
+      "weight": 1.0,
+      "relation": "revises_understanding_of"
+    },
+    {
+      "source": "Optimistic Exploration",
+      "target": "R-max Algorithm",
+      "weight": 0.9,
+      "relation": "characterised_by"
+    },
+    {
+      "source": "Optimistic Exploration",
+      "target": "PAC-MDP",
+      "weight": 0.8,
+      "relation": "relevant_to"
+    },
+    {
+      "source": "Optimistic Exploration",
+      "target": "Correction: Admissibility Not Required for Potential Functions in PAC-MDPs",
+      "weight": 0.8,
+      "relation": "preserves"
+    },
+    {
+      "source": "Optimistic Exploration",
+      "target": "Sufficient Conditions for PAC-MDPs: Φ(s) ≥ 0 for Unknown States, Φ(s) = 0 for Known Terminal States",
+      "weight": 0.9,
+      "relation": "preserves"
+    },
+    {
+      "source": "Nash Equilibrium",
+      "target": "Multi-agent Reinforcement Learning",
+      "weight": 0.9,
+      "relation": "involves_concept"
+    },
+    {
+      "source": "Nash Equilibrium",
+      "target": "Non-zero Terminal Potentials Alter Nash Equilibria in Multi-agent RL",
+      "weight": 1.0,
+      "relation": "shows_impact_on"
+    },
+    {
+      "source": "Multi-agent Reinforcement Learning",
+      "target": "Non-zero Terminal Potentials Alter Nash Equilibria in Multi-agent RL",
+      "weight": 0.9,
+      "relation": "occurs_in"
+    },
+    {
+      "source": "PAC-MDP",
+      "target": "Correction: Admissibility Not Required for Potential Functions in PAC-MDPs",
+      "weight": 1.0,
+      "relation": "applies_to"
+    },
+    {
+      "source": "PAC-MDP",
+      "target": "Sufficient Conditions for PAC-MDPs: Φ(s) ≥ 0 for Unknown States, Φ(s) = 0 for Known Terminal States",
+      "weight": 1.0,
+      "relation": "are_conditions_for"
+    },
+    {
+      "source": "Model-Free Reinforcement Learning",
+      "target": "Q-learning",
+      "weight": 0.8,
+      "relation": "includes_algorithm"
+    },
+    {
+      "source": "Model-Free Reinforcement Learning",
+      "target": "UCT Algorithm",
+      "weight": 0.7,
+      "relation": "includes_algorithm"
+    },
+    {
+      "source": "Model-Based Reinforcement Learning",
+      "target": "R-max Algorithm",
+      "weight": 0.8,
+      "relation": "includes_algorithm"
+    },
+    {
+      "source": "Mathematical Derivations",
+      "target": "Dual Linear Programming Formulations",
+      "weight": 0.7,
+      "relation": "uses_method"
+    }
+  ],
+  "format_version": "1.0"
+}
