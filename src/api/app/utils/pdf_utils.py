@@ -10,7 +10,7 @@ def extract_text(pdf_path: Path, max_pages: Optional[int] = None) -> tuple[str, 
         page_limit = min(pages, max_pages) if max_pages else pages
         for page_num in range(page_limit):
             page = doc[page_num]
-            page_text = page.get_text()
+            page_text = page.get_text().replace('\x00', '')
             if page_text.strip():
                 text_parts.append(f"\n--- Page {page_num + 1} ---\n")
                 text_parts.append(page_text)

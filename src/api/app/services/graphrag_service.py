@@ -149,7 +149,7 @@ def _parse_csv_section(context: str, section_name: str) -> list[dict[str, str]]:
         return []
 
     # nano-graphrag emits comma+tab separators in CSV sections.
-    normalized_payload = payload.replace(",\t", ",")
+    normalized_payload = payload.replace(",\t", ",").replace("\x00", "")
     reader = csv.DictReader(
         io.StringIO(normalized_payload),
         delimiter=",",
