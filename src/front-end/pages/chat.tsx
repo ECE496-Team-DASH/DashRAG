@@ -316,12 +316,24 @@ export default function ChatPage() {
         }
       );
 
-      const maxAttempts = 120;
+      // Adaptive polling: starts at 800ms, uses server's estimated_remaining_ms to
+      // determine the next interval (remaining/5, clamped 800ms–4s). Falls back to
+      // fetching the full message list every 5 polls in case the progress endpoint
+      // is temporarily unavailable.
+      const MAX_WAIT_MS = 120_000;
+      const MIN_POLL_DELAY = 800;
+      const MAX_POLL_DELAY = 4_000;
+      let pollDelay = MIN_POLL_DELAY;
+      let elapsed = 0;
       let assistantMessage: any = null;
       let latestCompletedMs: number | undefined;
+      let fallbackCounter = 0;
 
-      for (let attempt = 0; attempt < maxAttempts; attempt++) {
-        await new Promise((resolve) => setTimeout(resolve, 1000));
+      while (elapsed < MAX_WAIT_MS && !assistantMessage) {
+        await new Promise((resolve) => setTimeout(resolve, pollDelay));
+        elapsed += pollDelay;
+        let nextPollDelay = Math.min(MAX_POLL_DELAY, Math.round(pollDelay * 1.4));
+        let progressCompleted = false;
 
         try {
           const progress = await dashragAPI.getMessageProgress(sessionId, createResult.message_id);
@@ -336,19 +348,32 @@ export default function ChatPage() {
           if (progress.status === "error") {
             throw new Error(progress.error || "Query failed while processing");
           }
+
+          if (progress.status === "completed") {
+            progressCompleted = true;
+          } else if (progress.estimated_remaining_ms && progress.estimated_remaining_ms > 0) {
+            // Poll at remaining/5 so we check ~5 times before the expected finish
+            nextPollDelay = Math.min(MAX_POLL_DELAY, Math.max(MIN_POLL_DELAY, Math.round(progress.estimated_remaining_ms / 5)));
+          }
         } catch (progressErr) {
-          // Keep polling for the final assistant message even if progress endpoint is temporarily unavailable.
+          // Keep going — check messages directly as fallback
         }
 
-        const allMessages = await dashragAPI.getMessages(sessionId);
-        const userMsgIndex = allMessages.findIndex((m) => Number(m.id) === createResult.message_id);
-        if (userMsgIndex >= 0 && userMsgIndex < allMessages.length - 1) {
-          const maybeAssistant = allMessages[userMsgIndex + 1];
-          if (maybeAssistant && maybeAssistant.role === "assistant") {
-            assistantMessage = maybeAssistant;
-            break;
+        fallbackCounter++;
+        // Fetch the full message list when progress is complete, or every 5 polls as a safety net
+        if (progressCompleted || fallbackCounter >= 5) {
+          fallbackCounter = 0;
+          const allMessages = await dashragAPI.getMessages(sessionId);
+          const userMsgIndex = allMessages.findIndex((m) => Number(m.id) === createResult.message_id);
+          if (userMsgIndex >= 0 && userMsgIndex < allMessages.length - 1) {
+            const maybeAssistant = allMessages[userMsgIndex + 1];
+            if (maybeAssistant && maybeAssistant.role === "assistant") {
+              assistantMessage = maybeAssistant;
+            }
           }
         }
+
+        pollDelay = nextPollDelay;
       }
 
       if (!assistantMessage) {

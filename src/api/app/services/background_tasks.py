@@ -27,6 +27,7 @@ from ..services.query_progress import (
     fail_message_progress,
 )
 from ..db import SessionLocal
+from ..config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -314,12 +315,40 @@ def process_message_query(
         # Execute query against knowledge graph
         rag = DashRAGService(graph_dir)
         try:
-            # Run async GraphRAG operation in new event loop
+            # Run async GraphRAG operation with a hard timeout to prevent infinite hangs.
+            # Timeout is controlled by QUERY_TIMEOUT_SECONDS env var (default: 180s).
             _sync_progress("querying_graphrag", "Querying knowledge graph", 45)
             cleaned_qp_kwargs = {k: v for k, v in (qp_kwargs or {}).items() if v is not None}
-            answer_payload = asyncio.run(rag.query(prompt, **cleaned_qp_kwargs))
+            async def _timed_query():
+                return await asyncio.wait_for(
+                    rag.query(prompt, **cleaned_qp_kwargs),
+                    timeout=float(settings.query_timeout_seconds)
+                )
+            answer_payload = asyncio.run(_timed_query())
             _sync_progress("building_response", "Building response", 85)
             logger.info(f"Query completed successfully for message {message_id}")
+        except asyncio.TimeoutError:
+            timeout_secs = settings.query_timeout_seconds
+            error_msg = f"Query timed out after {timeout_secs}s. Try a shorter query or switch to naive mode."
+            logger.error(f"Message {message_id} query timed out after {timeout_secs}s")
+            elapsed_ms = int((time.perf_counter() - op_started) * 1000)
+            fail_message_progress(message_id, elapsed_ms=elapsed_ms, error=error_msg)
+            m_asst = Message(
+                session_id=session_id,
+                role=Role.assistant,
+                content={
+                    "text": error_msg,
+                    "error": True,
+                    "timing": {
+                        "started_at": op_started_dt.isoformat(),
+                        "completed_at": datetime.now(timezone.utc).isoformat(),
+                        "duration_ms": elapsed_ms,
+                    },
+                },
+            )
+            db.add(m_asst)
+            db.commit()
+            return
         except Exception as e:
             error_msg = f"GraphRAG query failed: {str(e)}"
             logger.error(error_msg, exc_info=True)

@@ -19,6 +19,16 @@ class Settings:
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "1440"))
     
+    # CORS allowed origins (comma-separated). Defaults include localhost dev + Vercel deployment.
+    cors_origins: list[str] = [
+        o.strip()
+        for o in os.getenv("CORS_ORIGINS", "http://localhost:3000,https://dashrag.vercel.app").split(",")
+        if o.strip()
+    ]
+
+    # Maximum seconds a GraphRAG query may run before being cancelled.
+    query_timeout_seconds: int = int(os.getenv("QUERY_TIMEOUT_SECONDS", "180"))
+
     # Optional features - set to None by default
     ngr_use_gemini: bool | None = None
     ngr_use_azure_openai: bool | None = None

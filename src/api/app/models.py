@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from sqlalchemy import String, DateTime, Enum, ForeignKey, JSON, Text, Integer
+from sqlalchemy import String, DateTime, Enum, ForeignKey, JSON, Text, Integer, Index
 from sqlalchemy.orm import relationship, Mapped, mapped_column
 import enum
 
@@ -74,6 +74,11 @@ class Document(Base):
 
     session = relationship("Session", back_populates="documents")
 
+    __table_args__ = (
+        # Speeds up listing & status-filtering documents within a session
+        Index("ix_documents_session_status", "session_id", "status"),
+    )
+
 class Message(Base):
     __tablename__ = "messages"
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -84,3 +89,8 @@ class Message(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now(timezone.utc))
 
     session = relationship("Session", back_populates="messages")
+
+    __table_args__ = (
+        # Speeds up fetching conversation history ordered by time within a session
+        Index("ix_messages_session_created", "session_id", "created_at"),
+    )
