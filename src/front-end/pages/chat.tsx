@@ -349,7 +349,7 @@ export default function ChatPage() {
             throw new Error(progress.error || "Query failed while processing");
           }
 
-          if (progress.status === "completed") {
+          if (progress.status === "complete") {
             progressCompleted = true;
           } else if (progress.estimated_remaining_ms && progress.estimated_remaining_ms > 0) {
             // Poll at remaining/5 so we check ~5 times before the expected finish
