@@ -68,3 +68,7 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: DBSession = Depe
     expire = datetime.now(timezone.utc) + timedelta(minutes=settings.access_token_expire_minutes)
     token = jwt.encode({"sub": str(user.id), "exp": expire}, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
     return {"access_token": token, "token_type": "bearer"}
+
+@router.get("/me")
+def me(user: User = Depends(get_current_user)):
+    return {"id": user.id, "email": user.email}

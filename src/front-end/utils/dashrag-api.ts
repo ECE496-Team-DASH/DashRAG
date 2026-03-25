@@ -3,6 +3,14 @@ import { Session, Document, DashRAGMessage, QueryMode, ArXivPaper, QueryProgress
 const API_BASE_URL = process.env.NEXT_PUBLIC_DASHRAG_API_URL || "http://localhost:8000";
 
 let authToken: string | null = null;
+let onUnauthorized: (() => void) | null = null;
+
+function handleResponse(response: Response): void {
+  if (response.status === 401) {
+    onUnauthorized?.();
+    throw new Error("Unauthorized");
+  }
+}
 
 function getAuthHeaders(isJson = true): Record<string, string> {
   const headers: Record<string, string> = {};
@@ -15,6 +23,9 @@ export const dashragAPI = {
   setAuthToken(token: string | null): void {
     authToken = token;
   },
+  setOnUnauthorized(fn: (() => void) | null): void {
+    onUnauthorized = fn;
+  },
   // Session Management
   async createSession(title: string = "New Chat"): Promise<Session> {
     const response = await fetch(`${API_BASE_URL}/sessions`, {
@@ -23,6 +34,7 @@ export const dashragAPI = {
       body: JSON.stringify({ title }),
     });
     
+    handleResponse(response);
     if (!response.ok) {
       throw new Error(`Failed to create session: ${response.statusText}`);
     }
@@ -35,6 +47,7 @@ export const dashragAPI = {
       headers: getAuthHeaders(false),
     });
     
+    handleResponse(response);
     if (!response.ok) {
       throw new Error(`Failed to get session: ${response.statusText}`);
     }
@@ -47,6 +60,7 @@ export const dashragAPI = {
       headers: getAuthHeaders(false),
     });
     
+    handleResponse(response);
     if (!response.ok) {
       throw new Error(`Failed to list sessions: ${response.statusText}`);
     }
@@ -60,6 +74,7 @@ export const dashragAPI = {
       headers: getAuthHeaders(false),
     });
     
+    handleResponse(response);
     if (!response.ok) {
       throw new Error(`Failed to delete session: ${response.statusText}`);
     }
@@ -72,6 +87,7 @@ export const dashragAPI = {
       body: JSON.stringify({ title }),
     });
     
+    handleResponse(response);
     if (!response.ok) {
       throw new Error(`Failed to rename session: ${response.statusText}`);
     }
@@ -90,6 +106,7 @@ export const dashragAPI = {
       body: formData,
     });
     
+    handleResponse(response);
     if (!response.ok) {
       const error = await response.text();
       throw new Error(`Failed to upload document: ${error}`);
@@ -105,6 +122,7 @@ export const dashragAPI = {
       body: JSON.stringify({ arxiv_id: arxivId }),
     });
     
+    handleResponse(response);
     if (!response.ok) {
       const error = await response.text();
       throw new Error(`Failed to add arXiv paper: ${error}`);
@@ -118,6 +136,7 @@ export const dashragAPI = {
       headers: getAuthHeaders(false),
     });
     
+    handleResponse(response);
     if (!response.ok) {
       throw new Error(`Failed to get documents: ${response.statusText}`);
     }
@@ -137,6 +156,7 @@ export const dashragAPI = {
       body: JSON.stringify({ content, mode }),
     });
 
+    handleResponse(response);
     if (!response.ok) {
       const error = await response.text();
       throw new Error(`Failed to send message: ${error}`);
@@ -156,6 +176,7 @@ export const dashragAPI = {
       body: JSON.stringify({ content, mode }),
     });
     
+    handleResponse(response);
     if (!response.ok) {
       const error = await response.text();
       throw new Error(`Failed to send message: ${error}`);
@@ -173,6 +194,7 @@ export const dashragAPI = {
       }
     );
 
+    handleResponse(response);
     if (!response.ok) {
       throw new Error(`Failed to get message progress: ${response.statusText}`);
     }
@@ -185,6 +207,10 @@ export const dashragAPI = {
       headers: getAuthHeaders(false),
     });
     
+    handleResponse(response);
+    if (!response.ok) {
+      throw new Error(`Failed to get messages: ${response.statusText}`);
+    }
     return response.json();
   },
 

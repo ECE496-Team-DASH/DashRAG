@@ -43,7 +43,44 @@ export const AuthProvider: FC<{ children: ReactNode }> = ({ children }) => {
   const API_BASE_URL = process.env.NEXT_PUBLIC_DASHRAG_API_URL || "http://localhost:8000";
 
   useEffect(() => {
-    setIsLoading(false);
+    if (!token) {
+      setIsLoading(false);
+      return;
+    }
+    // Validate the stored token against the server. This catches stale tokens
+    // left over from a previous deployment (or expired tokens) without requiring
+    // the user to manually log out.
+    fetch(`${API_BASE_URL}/auth/me`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((res) => {
+        if (res.ok) {
+          return res.json().then((data) => {
+            // Refresh user with real id from server (replaces the id:0 placeholder)
+            setUser({ id: data.id, email: data.email });
+          });
+        } else if (res.status === 401) {
+          // Token is invalid or expired — clear everything so the index.tsx guard
+          // will redirect to /login.
+          localStorage.removeItem(AUTH_TOKEN_KEY);
+          localStorage.removeItem(AUTH_EMAIL_KEY);
+          setToken(null);
+          setUser(null);
+          dashragAPI.setAuthToken(null);
+        }
+        // Any other status (5xx, etc.) — keep existing state; don't log the user
+        // out just because the server is temporarily unhealthy.
+      })
+      .catch(() => {
+        // Network error — keep existing state; don't log out on flaky connectivity.
+      })
+      .finally(() => {
+        // Wire up the global 401 interceptor so mid-session token expiry also
+        // triggers a clean logout rather than showing cryptic API error messages.
+        dashragAPI.setOnUnauthorized(logout);
+        setIsLoading(false);
+      });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const login = async (email: string, password: string): Promise<void> => {
