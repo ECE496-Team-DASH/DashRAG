@@ -1,5 +1,9 @@
 import { Message, Citation } from "@/types";
 import { FC, useMemo, useState } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import remarkMath from "remark-math";
+import rehypeKatex from "rehype-katex";
 
 interface Props {
   message: Message;
@@ -84,10 +88,21 @@ export const ChatMessage: FC<Props> = ({ message }) => {
   return (
     <div className={`flex flex-col ${message.role === "assistant" ? "items-start" : "items-end"}`}>
       <div
-        className={`flex items-center ${message.role === "assistant" ? "bg-neutral-200 text-neutral-900" : "bg-blue-500 text-white"} rounded-2xl px-3 py-2 max-w-[67%] whitespace-pre-wrap`}
+        className={`flex items-start ${message.role === "assistant" ? "bg-neutral-200 text-neutral-900" : "bg-blue-500 text-white"} rounded-2xl px-3 py-2 max-w-[67%]`}
         style={{ overflowWrap: "anywhere" }}
       >
-        {messageText}
+        {message.role === "assistant" ? (
+          <div className="prose-sm leading-relaxed [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 [&>h1]:font-bold [&>h2]:font-bold [&>h3]:font-bold [&>ul]:list-disc [&>ul]:pl-4 [&>ol]:list-decimal [&>ol]:pl-4 [&>li]:ml-1 [&_code]:font-mono [&_code]:bg-neutral-300 [&_code]:px-1 [&_code]:py-0.5 [&_code]:rounded [&_pre]:bg-neutral-300 [&_pre]:rounded [&_pre]:p-2 [&_pre]:overflow-x-auto [&_pre>code]:bg-transparent [&_pre>code]:p-0 [&>p]:mb-2 [&>blockquote]:border-l-2 [&>blockquote]:border-neutral-400 [&>blockquote]:pl-2 [&>blockquote]:italic">
+            <ReactMarkdown
+              remarkPlugins={[remarkGfm, remarkMath]}
+              rehypePlugins={[rehypeKatex]}
+            >
+              {messageText}
+            </ReactMarkdown>
+          </div>
+        ) : (
+          <span className="whitespace-pre-wrap">{messageText}</span>
+        )}
       </div>
 
       {message.role === "assistant" && formatDuration(durationMs) && (

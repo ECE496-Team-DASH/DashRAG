@@ -1,11 +1,11 @@
 import { Chat } from "@/components/Chat/Chat";
 import { Footer } from "@/components/Layout/Footer";
 import { Navbar } from "@/components/Layout/Navbar";
-import { Message, Document, QueryMode, StatusMessage as StatusMsg, ProcessingPhase, ArXivPaper } from "@/types";
+import { Message, Document, QueryMode, StatusMessage as StatusMsg, ProcessingPhase, ArXivPaper, DashRAGMessage } from "@/types";
 import { dashragAPI } from "@/utils/dashrag-api";
 import { useAuth } from "@/utils/AuthContext";
 import Head from "next/head";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 
 const makeStatusId = () =>
@@ -54,12 +54,6 @@ export default function ChatPage() {
   const [arxivSearching, setArxivSearching] = useState<boolean>(false);
   const [arxivError, setArxivError] = useState<string | null>(null);
 
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
-
   // Auth guard
   useEffect(() => {
     if (!authLoading && !token) {
@@ -87,6 +81,7 @@ export default function ChatPage() {
             setSessionId(savedSessionId);
             setSessionTitle(sessionData.title);
             await loadDocuments(savedSessionId);
+            await loadMessages(savedSessionId);
             return;
           } catch (error) {
             console.log("Saved session not found, creating new one");
@@ -124,6 +119,18 @@ export default function ChatPage() {
     }
   };
 
+  const loadMessages = async (sid: string) => {
+    try {
+      const apiMessages: DashRAGMessage[] = await dashragAPI.getMessages(sid);
+      const mapped: Message[] = apiMessages
+        .filter((m) => m.role === "user" || m.role === "assistant")
+        .map((m) => ({ role: m.role, content: m.content }));
+      setMessages(mapped);
+    } catch (error) {
+      console.error("Failed to load messages:", error);
+    }
+  };
+
   const addStatusMessage = (
     status: "uploading" | "processing" | "ready" | "error",
     message: string,
@@ -143,7 +150,6 @@ export default function ChatPage() {
       ...extras,
     };
     setStatusMessages((prev) => [...prev, statusMsg]);
-    setTimeout(() => scrollToBottom(), 100);
     return id;
   };
 
@@ -502,10 +508,6 @@ export default function ChatPage() {
     }
   };
 
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages, statusMessages]);
-
   if (authLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gray-50">
@@ -575,7 +577,6 @@ export default function ChatPage() {
                 Initializing session...
               </div>
             )}
-            <div ref={messagesEndRef} />
           </div>
         </div>
         <Footer />
